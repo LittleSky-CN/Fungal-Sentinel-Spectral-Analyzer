@@ -15,6 +15,12 @@ class TurbidityWindow:
         self.win = tk.Toplevel(parent)
         self.win.title("FSSA - Turbidity Measurement")
         self.win.geometry("900x700")
+        try:
+            from gui import theme as _t
+            from config import THEME_ENABLED as _on
+            if _on: _t.tint(self.win)
+        except Exception:
+            pass
         self.mapping = mapping
         self.calibrator = calibrator
         self.analyzer = TurbidityAnalyzer(mapping, calibrator)

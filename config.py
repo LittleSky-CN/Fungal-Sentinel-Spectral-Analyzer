@@ -16,3 +16,6 @@ DEFAULT_PARAMS = {
     "valid_wavelength_range": (430, 660), # 【修复】重新引入波长范围保护
     "smooth_window": 21
 }
+
+THEME_ENABLED = True
+PIXEL_FONT = {"path": "assets/pixel.ttf", "family": "Press Start 2P"}  # 可选
