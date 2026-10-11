@@ -406,6 +406,7 @@ class FSSA_GUI:
                 # 【补充】占位键：让 details 窗口不报错，但 _build_tab2 的 else 分支会显示提示
                 "measured_total": None,
                 "corrected_total": None,
+                "pos_R": None, "pos_G": None, "pos_B": None,
             }
             self.log_status(2, f"Loaded from {Path(file_path).name}", "green")
             messagebox.showinfo("Success", "SPD parameters loaded successfully!\nNote: fusion/comparison charts need a fresh calibration.")
@@ -544,6 +545,14 @@ class FSSA_GUI:
 
             wl_order_check = self.mapping.pixel_to_wavelength(y_pixels)
             lamp_aligned = measured_rgb[::-1, :] if wl_order_check[0] > wl_order_check[-1] else measured_rgb
+            # 【v1.4.4-fix】独立验证数据：定位光源剖面（Step 1 缓存），按波长对齐
+            pos_R = pos_G = pos_B = None
+            pos_profiles = self.cache_step1.get("profiles")
+            if pos_profiles is not None:
+                pos_rgb = np.column_stack((pos_profiles["red"], pos_profiles["green"], pos_profiles["blue"]))
+                if pos_rgb.shape[0] == measured_rgb.shape[0]:
+                    pos_aligned = pos_rgb[::-1, :] if wl_order_check[0] > wl_order_check[-1] else pos_rgb
+                    pos_R, pos_G, pos_B = pos_aligned[:, 0], pos_aligned[:, 1], pos_aligned[:, 2]
 
             # 【关键修复】计算 measured_total 和 corrected_total，供 Details Tab 2 第二张子图使用
             measured_total = np.sum(measured_rgb, axis=1)
@@ -566,6 +575,7 @@ class FSSA_GUI:
                 "measured_total": measured_total,
                 "corrected_total": corrected_total,
                 "n_spd_shots": len(spd_files),  # 【新增】用于参数面板显示
+                "pos_R": pos_R, "pos_G": pos_G, "pos_B": pos_B
             }
 
             self.log_status(2, "Absolute per-channel response generated.", "green")
