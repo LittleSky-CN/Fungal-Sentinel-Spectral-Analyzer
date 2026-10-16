@@ -222,6 +222,30 @@ class FSSA_GUI:
                                       relief="flat", highlightthickness=1,
                                       highlightbackground=_theme.CYAN)
 
+    def _collapsible_section(self, master, title, initially_open=False):
+        """可折叠选项区：默认收纳，点击标题展开/收起。返回 body Frame。"""
+        holder = ttk.Frame(master)
+        holder.pack(fill=tk.X, pady=5)
+        body = ttk.Frame(holder, style="Card.TFrame") if _THEME_ON else ttk.Frame(holder)
+        state = {"open": initially_open}
+
+        def _toggle():
+            if state["open"]:
+                state["open"] = False
+                body.pack_forget()
+                hdr.config(text=f"▶ {title}")
+            else:
+                state["open"] = True
+                body.pack(fill=tk.X, padx=2, pady=2)
+                hdr.config(text=f"▼ {title}")
+
+        hdr = self._btn(holder, f"▶ {title}", kind="yellow", command=_toggle)
+        hdr.pack(fill=tk.X)
+        if initially_open:
+            body.pack(fill=tk.X, padx=2, pady=2)
+            hdr.config(text=f"▼ {title}")
+        return body
+
     def _setup_page1(self):
         f = self.page1
         self._head_label(f, "Step 1: Wavelength Calibration", "blue").pack(anchor=tk.W, pady=(0, 10))
@@ -284,48 +308,81 @@ class FSSA_GUI:
         f = self.page4
         self._head_label(f, "Step 4: Concentration Quantification", "red").pack(anchor=tk.W, pady=(0, 10))
 
+        # ---- 标准品滚动列表 ----
         canvas_frame = ttk.Frame(f); canvas_frame.pack(fill=tk.BOTH, expand=True, pady=5)
         self.std_canvas = tk.Canvas(canvas_frame, highlightthickness=0)
         if _THEME_ON:
             self.std_canvas.configure(bg=_theme.BLACK)
         scrollbar = ttk.Scrollbar(canvas_frame, orient="vertical", command=self.std_canvas.yview)
         self.std_rows_frame = ttk.Frame(self.std_canvas)
+
+        # 【修复1】内嵌框架宽度跟随画布 → 卡片随左栏扩充而变宽
+        self._std_win_id = self.std_canvas.create_window((0, 0), window=self.std_rows_frame, anchor="nw")
+        def _on_canvas_configure(e):
+            self.std_canvas.itemconfig(self._std_win_id, width=e.width)
+            self.std_canvas.configure(scrollregion=self.std_canvas.bbox("all"))
+        self.std_canvas.bind("<Configure>", _on_canvas_configure)
         self.std_rows_frame.bind("<Configure>", lambda e: self.std_canvas.configure(scrollregion=self.std_canvas.bbox("all")))
-        self.std_canvas.create_window((0, 0), window=self.std_rows_frame, anchor="nw")
         self.std_canvas.configure(yscrollcommand=scrollbar.set)
         self.std_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
+        # 【修复2】恢复滚轮绑定，且仅当指针位于标准品列表内才生效
+        def _in_std(widget):
+            while widget is not None and widget is not self.root:
+                if widget is self.std_canvas:
+                    return True
+                widget = widget.master
+            return False
+
         def _on_mousewheel(event):
-            # 仅当鼠标位于主窗口内才滚动标准品列表（避免与子窗口冲突）
-            if event.widget.winfo_toplevel() is not self.root:
+            if not _in_std(event.widget):
                 return
-            if event.num == 4: self.std_canvas.yview_scroll(-1, "units")
-            elif event.num == 5: self.std_canvas.yview_scroll(1, "units")
-            else: self.std_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+            if getattr(event, "num", None) == 4:
+                self.std_canvas.yview_scroll(-1, "units")
+            elif getattr(event, "num", None) == 5:
+                self.std_canvas.yview_scroll(1, "units")
+            else:
+                d = getattr(event, "delta", 0)
+                if d:
+                    self.std_canvas.yview_scroll(int(-1 * (d / 120)), "units")
+        self.std_canvas.bind_all("<MouseWheel>", _on_mousewheel)
+        self.std_canvas.bind_all("<Button-4>", _on_mousewheel)
+        self.std_canvas.bind_all("<Button-5>", _on_mousewheel)
 
         self.std_rows = []
 
-        metric_frame = ttk.LabelFrame(f, text="Quantification Metric", padding=5)
-        metric_frame.pack(fill=tk.X, pady=5)
+        # ---- 【修复3】可折叠选项区（默认收纳）+ 手动换行防截断 ----
+        metric_body = self._collapsible_section(f, "Quantification Metric")
         self.metric_mode = tk.StringVar(value="unmixing")
-        self._radio(metric_frame, text="Spectral Unmixing: sample = α·E + s·Blank + k  [Recommended, ~10x lower LoD]",
-                    variable=self.metric_mode, value="unmixing").pack(anchor=tk.W)
-        self._radio(metric_frame, text="Plain blank-subtracted AUC (Legacy)",
-                    variable=self.metric_mode, value="legacy").pack(anchor=tk.W)
+        self._radio(metric_body,
+                    text="Spectral Unmixing:\n  sample = α·E + s·Blank + k\n  [Recommended, ~10x lower LoD]",
+                    variable=self.metric_mode, value="unmixing").pack(anchor=tk.W, pady=2)
+        self._radio(metric_body,
+                    text="Plain blank-subtracted AUC (Legacy)",
+                    variable=self.metric_mode, value="legacy").pack(anchor=tk.W, pady=2)
 
-        reg_frame = ttk.LabelFrame(f, text="Regression Method", padding=5)
-        reg_frame.pack(fill=tk.X, pady=5)
+        reg_body = self._collapsible_section(f, "Regression Method")
         self.regression_method = tk.StringVar(value="ols")
-        self._radio(reg_frame, text="Ordinary Least Squares (OLS)", variable=self.regression_method, value="ols").pack(anchor=tk.W)
-        self._radio(reg_frame, text="Weighted (1/y) - For count data", variable=self.regression_method, value="weighted_1y").pack(anchor=tk.W)
-        self._radio(reg_frame, text="Weighted (1/y²) - For fluorescence (Recommended)", variable=self.regression_method, value="weighted_1y2").pack(anchor=tk.W)
+        self._radio(reg_body,
+                    text="Ordinary Least Squares (OLS)",
+                    variable=self.regression_method, value="ols").pack(anchor=tk.W, pady=2)
+        self._radio(reg_body,
+                    text="Weighted (1/y):\n  for count data",
+                    variable=self.regression_method, value="weighted_1y").pack(anchor=tk.W, pady=2)
+        self._radio(reg_body,
+                    text="Weighted (1/y²):\n  for fluorescence (Recommended)",
+                    variable=self.regression_method, value="weighted_1y2").pack(anchor=tk.W, pady=2)
 
+        # ---- 操作按钮 ----
         btn_frame = ttk.Frame(f); btn_frame.pack(fill=tk.X, pady=5)
+        btn_frame = ttk.Frame(f); btn_frame.pack(fill=tk.X, pady=5)
+        btn_frame.columnconfigure(0, weight=1)   # + Add Std 占 1 份
+        btn_frame.columnconfigure(1, weight=2)   # Build Curve 占 2 份
         self.btn_add_std = self._btn(btn_frame, "+ Add Std", kind="yellow", command=self.add_std_row)
-        self.btn_add_std.pack(side=tk.LEFT, padx=2)
+        self.btn_add_std.grid(row=0, column=0, sticky="we", padx=(0, 2))
         self.btn_calc_conc = self._btn(btn_frame, "Build Curve & Calculate", kind="magenta", command=self.calculate_concentration)
-        self.btn_calc_conc.pack(side=tk.LEFT, padx=2)
+        self.btn_calc_conc.grid(row=0, column=1, sticky="we", padx=(2, 0))
         self.add_std_row(); self.add_std_row()
         self.lbl_status4 = self._status_label(f); self.lbl_status4.pack(anchor=tk.W, pady=5)
 
@@ -521,7 +578,11 @@ class FSSA_GUI:
             colors = {"red": "red", "green": "green", "blue": "blue"}
             cc = self._centroid_color()
             for name, prof in avg_profiles.items(): self.ax.plot(prof, color=colors[name], label=f"{name.capitalize()} (Avg)", linewidth=1.5)
-            for p in peaks: self.ax.axvline(p.y_centroid, linestyle="--", color=cc, label=f"{p.name}")
+            for p in peaks:
+                if p.quality == "suspect":
+                    log_text += (f"[WARN] {p.name} peak suspect: estimator={p.estimator}, "
+                                 f"n_maxima={p.n_maxima}, centroid_legacy-pick="
+                                 f"{p.centroid_legacy - p.y_centroid:+.1f}px\n")
             self.set_chart_title("Step 1: Wavelength Calibration Profiles")
             self.ax.set_xlabel("Y Pixel"); self.ax.set_ylabel("Intensity"); self.ax.legend(fontsize=8)
             self._style_fig(self.fig); self.fig.tight_layout(); self.canvas_plot.draw()
@@ -674,14 +735,24 @@ class FSSA_GUI:
         if len(self.std_rows) >= 10: messagebox.showinfo("Info", "Max 10 standards."); return
         row_frame = ttk.LabelFrame(self.std_rows_frame, text=f"Standard {len(self.std_rows) + 1}", padding=5)
         row_frame.pack(fill=tk.X, pady=5)
+
+        # 【修复】top_frame 必须 pack，否则 Conc 输入框与 X 删除按钮整行不可见
         top_frame = ttk.Frame(row_frame, style="Card.TFrame") if _THEME_ON else ttk.Frame(row_frame)
-        self._card_label(top_frame, "Conc:").pack(side=tk.LEFT)
+        top_frame.pack(fill=tk.X, pady=(0, 2))
+        top_frame.columnconfigure(1, weight=1)   # 浓度输入框等比拉伸，与整行对齐
+        self._card_label(top_frame, "Conc:").grid(row=0, column=0, sticky="w")
         conc_var = tk.StringVar(value="0.0")
-        ttk.Entry(top_frame, textvariable=conc_var, width=6).pack(side=tk.LEFT, padx=5)
-        self._btn(top_frame, "X", kind="pale", width=3, command=lambda r=row_frame: self.remove_std_row(r)).pack(side=tk.RIGHT)
-        mini_blank = MultiFileSelector(row_frame, "Blank (1-5)", max_files=5, surface="card"); mini_blank.pack(fill=tk.X, pady=2)
-        mini_sample = MultiFileSelector(row_frame, "Sample (1-5)", max_files=5, surface="card"); mini_sample.pack(fill=tk.X, pady=2)
-        self.std_rows.append({"frame": row_frame, "conc_var": conc_var, "blank": mini_blank, "sample": mini_sample})
+        ttk.Entry(top_frame, textvariable=conc_var).grid(row=0, column=1, sticky="we", padx=5)
+        self._btn(top_frame, "X", kind="pale", width=3,
+                  command=lambda r=row_frame: self.remove_std_row(r)).grid(row=0, column=2, sticky="e")
+
+        mini_blank = MultiFileSelector(row_frame, "Blank (1-5)", max_files=5, surface="card")
+        mini_blank.pack(fill=tk.X, pady=2)
+        mini_sample = MultiFileSelector(row_frame, "Sample (1-5)", max_files=5, surface="card")
+        mini_sample.pack(fill=tk.X, pady=2)
+
+        self.std_rows.append({"frame": row_frame, "conc_var": conc_var,
+                              "blank": mini_blank, "sample": mini_sample})
         self.update_std_buttons()
 
     def remove_std_row(self, row_frame):

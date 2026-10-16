@@ -1,6 +1,7 @@
 # core/image_processing.py
 import re
 import cv2
+from dataclasses import dataclass
 import numpy as np
 import tifffile as tiff
 from pathlib import Path
@@ -86,8 +87,25 @@ def get_average_profiles(dng_paths: List[str], x_roi: Tuple[int, int]) -> Dict[s
     n = len(dng_paths)
     return {k: v / n for k, v in sum_profiles.items()}
 
-def find_peak_auto(profile: np.ndarray, known) -> 'PeakResult':
-    from .calibration import PeakResult
+@dataclass
+class PeakResult:
+    name: str
+    wavelength_nm: float
+    channel_name: str
+    y_centroid: float
+    y_max: int
+    baseline: float
+    lo: int
+    hi: int
+    peak_height: float
+    # 【v1.4.5 新增，带默认值，旧调用不受影响】
+    estimator: str = "gauss"          # "gauss" | "edges"
+    n_maxima: int = 1
+    quality: str = "good"             # "good" | "suspect"
+    centroid_legacy: float = 0.0      # 旧质心，仅诊断用
+
+
+def find_peak_auto(profile: np.ndarray, known) -> PeakResult:
     n = len(profile)
     smooth = moving_average(profile, 11)
     valid_lo, valid_hi = 50, n - 50
@@ -95,17 +113,60 @@ def find_peak_auto(profile: np.ndarray, known) -> 'PeakResult':
     corrected = np.clip(smooth - baseline, 0, None)
     y_max = int(np.argmax(corrected[valid_lo:valid_hi]) + valid_lo)
     peak_height = float(corrected[y_max])
-    if peak_height <= 0: raise RuntimeError(f"No positive peak for {known.name}")
+    if peak_height <= 0:
+        raise RuntimeError(f"No positive peak for {known.name}")
     half = 0.5 * peak_height
+
+    # 1) 半高边（峰核边界）
     left, right = y_max, y_max
     while left > valid_lo and corrected[left] > half: left -= 1
     while right < valid_hi - 1 and corrected[right] > half: right += 1
-    lo, hi = max(valid_lo, left - 45), min(valid_hi, right + 46)
+    fwhm_lo, fwhm_hi = left, right
+    fw = max(1, fwhm_hi - fwhm_lo)
+
+    # 2) 【改进】谷界窗口：向外走到"重新上升"处即停，上限 1.5*FWHM+10
+    def valley_bound(start, step):
+        i, limit = start, start + step * int(1.5 * fw + 10)
+        while valid_lo < i < valid_hi - 1 and i != limit:
+            if corrected[i + step] >= corrected[i]:   # 剖面开始回升 => i 是谷
+                break
+            i += step
+        return i
+    lo = max(valid_lo, valley_bound(fwhm_lo, -1))
+    hi = min(valid_hi, valley_bound(fwhm_hi, +1) + 1)
+
+    # 3) 单峰性检查（窗内 >20% 峰高的局部极大个数）
+    win = corrected[lo:hi]
+    thr = 0.2 * peak_height
+    n_max = sum(1 for i in range(1, len(win) - 1)
+                if win[i] >= thr and win[i] >= win[i - 1] and win[i] > win[i + 1])
+
+    # 4) 估计量：半高区 log-抛物线(高斯)顶点；失败/出界则用半高边中点
+    g = np.arange(fwhm_lo, fwhm_hi + 1, dtype=np.float64)
+    v = np.clip(corrected[fwhm_lo:fwhm_hi + 1], 1e-9, None)
+    gauss_c = edge_c = 0.5 * (fwhm_lo + fwhm_hi)
+    estimator = "edges"
+    if len(g) >= 5:
+        coef = np.polyfit(g, np.log(v), 2)
+        if coef[0] < -1e-12:
+            cand = float(-coef[1] / (2 * coef[0]))
+            if fwhm_lo <= cand <= fwhm_hi:
+                gauss_c, estimator = cand, "gauss"
+    y_center = gauss_c if estimator == "gauss" else edge_c
+
+    # 5) 一致性校验 + 旧质心(诊断)
     ys = np.arange(lo, hi, dtype=np.float64)
-    weights = np.clip(profile[lo:hi] - baseline, 0, None)
-    if weights.sum() <= 0: raise RuntimeError(f"Centroid failed for {known.name}")
-    y_centroid = float((ys * weights).sum() / weights.sum())
-    return PeakResult(known.name, known.wavelength_nm, known.channel_name, y_centroid, y_max, baseline, lo, hi, peak_height)
+    w = np.clip(profile[lo:hi] - baseline, 0, None)
+    centroid_legacy = float((ys * w).sum() / w.sum()) if w.sum() > 0 else float(y_max)
+    suspect = (n_max > 1) or (abs(y_center - edge_c) > 0.25 * fw)
+
+    return PeakResult(
+        known.name, known.wavelength_nm, known.channel_name,
+        float(y_center), y_max, baseline, lo, hi, peak_height,
+        estimator=estimator, n_maxima=int(n_max),
+        quality="suspect" if suspect else "good",
+        centroid_legacy=centroid_legacy,
+    )
 
 def parse_known_wavelengths(file_path: Optional[str | Path]) -> Dict[str, 'KnownWavelength']:
     from .calibration import KnownWavelength

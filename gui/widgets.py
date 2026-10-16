@@ -51,12 +51,14 @@ class MultiFileSelector(ttk.Frame):
 
         themed_label(self, title, surface=surface).pack(anchor=tk.W)
 
-        btn_frame = ttk.Frame(self)
+        btn_frame = ttk.Frame(self, style=("Card.TFrame" if (_THEME_ON and surface == "card") else "TFrame"))
         btn_frame.pack(fill=tk.X, pady=2)
+        btn_frame.columnconfigure(0, weight=2)   # Add 占 2 份
+        btn_frame.columnconfigure(1, weight=1)   # Clear 占 1 份
         themed_button(btn_frame, f"Add (Max {max_files})", kind="yellow",
-                      width=14, command=self.add_files).pack(side=tk.LEFT)
+                      command=self.add_files).grid(row=0, column=0, sticky="we", padx=(0, 2))
         themed_button(btn_frame, "Clear", kind="pale",
-                      width=6, command=self.clear_files).pack(side=tk.LEFT, padx=5)
+                      command=self.clear_files).grid(row=0, column=1, sticky="we", padx=(2, 0))
 
         if _THEME_ON:
             self.listbox = tk.Listbox(

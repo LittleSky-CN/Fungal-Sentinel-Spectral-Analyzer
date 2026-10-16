@@ -322,7 +322,8 @@ class DetailsWindow:
             ax4a.text(0.5, 0.5, "Positioning profiles not cached (loaded from JSON or old cache).\nRe-run Step 1 + Step 2 from DNG.",
                       ha='center', va='center', transform=ax4a.transAxes, color=ink)
         ax4a.set_title("Figure 4a: Positioning Light Source - RAW Measured (per channel, absolute units)", fontsize=13)
-        ax4a.legend(fontsize=9); ax4a.grid(True, linestyle=':', alpha=0.5)
+        if pos_avail: ax4a.legend(fontsize=9)
+        ax4a.grid(True, linestyle=':', alpha=0.5)
 
         # 4b CORRECTED (thin, should agree) + FUSED (thick, single continuous curve)
         ax4b = self.fig2.add_subplot(4, 1, 2)
@@ -337,7 +338,8 @@ class DetailsWindow:
             ax4b.text(0.5, 0.5, "Corrected positioning spectra not available.\nRe-run Step 1 + Step 2 from DNG.",
                       ha='center', va='center', transform=ax4b.transAxes, color=ink)
         ax4b.set_title("Figure 4b: Positioning Light Source - SPD-CORRECTED + Pointwise Fusion", fontsize=13)
-        ax4b.legend(fontsize=9); ax4b.grid(True, linestyle=':', alpha=0.5)
+        if pos_avail: ax4b.legend(fontsize=9)
+        ax4b.grid(True, linestyle=':', alpha=0.5)
 
         # 4c RESPONSE
         ax4c = self.fig2.add_subplot(4, 1, 3)
@@ -430,7 +432,7 @@ class DetailsWindow:
 
         ax3.plot(wls, intensity, '-', color=ink, linewidth=2, label='Net Spectrum')
         ax3.fill_between(wls, intensity, where=mask, color=fluor['color'], alpha=0.4, label='Integration')
-        ax3.axvline(fluor['peak_wl'], '--', color=ch["red"], label='Target Peak')
+        ax3.axvline(fluor['peak_wl'], linestyle='--', color=ch["red"], label='Target Peak')
         ax3.set_title("Figure: Background-Subtracted & SPD-Corrected Spectrum (Visible Band Only)", fontsize=14)
         ax3.set_xlabel("Wavelength (nm)", fontsize=12); ax3.set_ylabel("True Intensity", fontsize=12)
         ax3.legend(fontsize=10); ax3.grid(True, linestyle=':', alpha=0.5)

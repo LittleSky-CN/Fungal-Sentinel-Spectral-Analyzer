@@ -1,21 +1,34 @@
 # config.py
-"""Global configurations and fluorophore database for FSSA."""
+"""FSSA v1.4.4 Global Configuration."""
 
+# =============================================================================
+# 荧光蛋白/目标物数据库 (Fluorophore Database)
+# =============================================================================
 FLUOROPHORES = {
     "Ypet (Venus variant)": {"peak_wl": 527, "channel": "green", "fwhm": 20, "color": "green"},
-    "EGFP": {"peak_wl": 509, "channel": "green", "fwhm": 20, "color": "green"},
-    "mCherry": {"peak_wl": 610, "channel": "red", "fwhm": 25, "color": "red"},
-    "CFP": {"peak_wl": 475, "channel": "blue", "fwhm": 20, "color": "blue"},
-    "mTurquoise2": {"peak_wl": 482, "channel": "blue", "fwhm": 20, "color": "cyan"}
+    "EGFP":                 {"peak_wl": 509, "channel": "green", "fwhm": 20, "color": "green"},
+    "mCherry":              {"peak_wl": 610, "channel": "red",   "fwhm": 25, "color": "red"},
+    "CFP":                  {"peak_wl": 475, "channel": "blue",  "fwhm": 20, "color": "blue"},
+    "mTurquoise2":          {"peak_wl": 482, "channel": "blue",  "fwhm": 20, "color": "cyan"},
 }
 
+# =============================================================================
+# 核心算法默认参数 (供 core/calibration.py 等读取)
+# =============================================================================
 DEFAULT_PARAMS = {
-    "black_level": 64.0,
-    "display_percentile": 99.7,
-    "spd_threshold_ratio": 0.1,  # 【修复】提高阈值以过滤边缘噪声
-    "valid_wavelength_range": (430, 660), # 【修复】重新引入波长范围保护
-    "smooth_window": 21
+    "black_level": 64.0,                 # DNG 黑电平扣除
+    "display_percentile": 99.7,          # 预览归一化百分位
+    "spd_threshold_ratio": 0.1,          # SPD 可信阈值比例 (与 full_report 一致)
+    "valid_wavelength_range": (430.0, 660.0),  # 有效波段硬掩码 (与报告 Effective Band 一致)
+    "smooth_window": 21,                 # 平滑窗 (v1.4.4 流程中设为 1 可完全关闭平滑)
 }
 
+# =============================================================================
+# UI 主题配置 (Theme Configuration)
+# =============================================================================
 THEME_ENABLED = True
-PIXEL_FONT = {"path": "assets/pixel.ttf", "family": "Press Start 2P"}  # 可选
+
+PIXEL_FONT = {
+    "path": "assets/pixel.ttf",
+    "family": "Press Start 2P",
+}
