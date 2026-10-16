@@ -20,9 +20,12 @@ from core.image_processing import (
     parse_known_wavelengths, find_peak_auto, make_channel_profiles,
     load_true_spd_data, np_trapz
 )
-from core.calibration import LinearMapping, TwoPointValidation, SpectralResponseCalibrator
+from core.calibration import (
+    LinearMapping, TwoPointValidation, SpectralResponseCalibrator,
+    analyze_blank_subtracted_replicates, correct_by_response, remove_isolated_spikes,
+)
 from core.quantification import calculate_concentration
-from core.unmixing import (unmix_spectrum, build_reference_emission, emission_auc,
+from core.unmixing import (unmix_spectrum, select_reference_emission,
                            default_unmix_window, slope_t_statistic)
 from gui.widgets import MultiFileSelector
 from gui.details_window import DetailsWindow
@@ -488,13 +491,10 @@ class FSSA_GUI:
             messagebox.showerror("Error", f"Failed to load SPD params: {str(e)}")
 
     # ================= Core Signal Extraction =================
-    def _resp_interp_guarded(self, wavelengths, ch_name):
+    def _interp_response(self, wavelengths, ch_name):
         resp_map = {"red": self.calibrator.response_R, "green": self.calibrator.response_G, "blue": self.calibrator.response_B}
         resp_ch = resp_map[ch_name]
-        ch_max = float(np.max(resp_ch)) if resp_ch is not None and len(resp_ch) else 0.0
-        floor = 0.05 * ch_max if ch_max > 0 else 1e-9
-        resp_interp = np.interp(wavelengths, self.calibrator.wavelengths, resp_ch)
-        return np.where(resp_interp > floor, resp_interp, floor)
+        return np.interp(wavelengths, self.calibrator.wavelengths, resp_ch)
 
     def calculate_net_signal_single(self, avg_blank_rgb, sample_path, fluor_config):
         ch_name = fluor_config['channel']
@@ -509,23 +509,49 @@ class FSSA_GUI:
             wavelengths = wavelengths[::-1]
             net_rgb = net_rgb[::-1, :]
         if self.calibrator:
-            true_intensity = net_rgb[:, ch_idx] / self._resp_interp_guarded(wavelengths, ch_name)
+            response = self._interp_response(wavelengths, ch_name)
+            true_intensity = correct_by_response(net_rgb[:, ch_idx], response)
         else:
             true_intensity = net_rgb[:, ch_idx]
+        true_intensity = remove_isolated_spikes(true_intensity)
         target_wl, fwhm = fluor_config['peak_wl'], fluor_config['fwhm']
         mask = (wavelengths >= target_wl - fwhm / 2) & (wavelengths <= target_wl + fwhm / 2)
         area = np_trapz(true_intensity[mask], wavelengths[mask]) if np.any(mask) else 0
         return area, wavelengths, true_intensity, mask
 
     def get_net_areas_batch(self, blank_paths, sample_paths, fluor_config):
-        avg_blank_rgb = np.column_stack([get_average_profiles(blank_paths, self.x_roi)[c] for c in ["red", "green", "blue"]])
-        areas = []
-        last_wls, last_int, last_mask = None, None, None
-        for s_path in sample_paths:
-            area, wls, intensity, mask = self.calculate_net_signal_single(avg_blank_rgb, s_path, fluor_config)
-            areas.append(area)
-            last_wls, last_int, last_mask = wls, intensity, mask
-        return areas, last_wls, last_int, last_mask
+        if not blank_paths or not sample_paths:
+            raise ValueError("At least one blank and one sample image are required")
+        blank_profiles = get_average_profiles(blank_paths, self.x_roi)
+        channel = fluor_config["channel"]
+        channel_index = {"red": 0, "green": 1, "blue": 2}[channel]
+        blank_rgb = np.column_stack([blank_profiles[c] for c in ["red", "green", "blue"]])
+        sample_profiles = []
+        for sample_path in sample_paths:
+            rgb, _ = read_dng_linear_rgb(sample_path)
+            profiles = make_channel_profiles(rgb, self.x_roi)
+            sample_profiles.append(np.column_stack([profiles[c] for c in ["red", "green", "blue"]]))
+
+        if any(profile.shape != blank_rgb.shape for profile in sample_profiles):
+            raise ValueError("Blank and sample profiles must have matching dimensions")
+        sample_rgb = np.stack(sample_profiles)
+        wavelengths = self.mapping.pixel_to_wavelength(np.arange(len(blank_rgb)))
+        if wavelengths[0] > wavelengths[-1]:
+            wavelengths = wavelengths[::-1]
+            blank_rgb = blank_rgb[::-1, :]
+            sample_rgb = sample_rgb[:, ::-1, :]
+
+        response = self._interp_response(wavelengths, channel) if self.calibrator else None
+        target_wl, fwhm = fluor_config["peak_wl"], fluor_config["fwhm"]
+        mask = (wavelengths >= target_wl - fwhm / 2) & (wavelengths <= target_wl + fwhm / 2)
+        areas, intensity = analyze_blank_subtracted_replicates(
+            blank_rgb[:, channel_index],
+            sample_rgb[:, :, channel_index],
+            wavelengths,
+            mask,
+            response,
+        )
+        return areas.tolist(), wavelengths, intensity, mask
 
     def get_raw_channel_spectra(self, paths, fluor_config):
         """Per-shot SPD-corrected channel spectra WITHOUT blank subtraction (for unmixing)."""
@@ -541,7 +567,8 @@ class FSSA_GUI:
             if wavelengths[0] > wavelengths[-1]:
                 wavelengths = wavelengths[::-1]; spec_rgb = spec_rgb[::-1, :]
             if self.calibrator:
-                intensity = spec_rgb[:, ch_idx] / self._resp_interp_guarded(wavelengths, ch_name)
+                response = self._interp_response(wavelengths, ch_name)
+                intensity = correct_by_response(spec_rgb[:, ch_idx], response)
             else:
                 intensity = spec_rgb[:, ch_idx]
             specs.append(intensity); wls_out = wavelengths
@@ -692,6 +719,8 @@ class FSSA_GUI:
 
             log_text = f"\n=== Step 3: {'Turbidity' if self.is_turbidity_mode else 'Sample'} Analysis ===\n"
             log_text += f"SPD Correction Status: {spd_status}\n"
+            log_text += ("SPD reliability: channels below 20% of peak response excluded\n"
+                         "Spike rejection: isolated outliers only (5-point neighborhood, 4.5 MAD)\n")
             if not self.is_turbidity_mode: log_text += f"Fluorophore: {self.current_fluorophore}\n"
             log_text += f"Net Area (Mean): {mean_area:.2f} | Peak: {peak:.2f}\n"
             log_text += f"--- Microplate Reader Style Parameters ---\n"
@@ -793,8 +822,22 @@ class FSSA_GUI:
                     row_spectra.append({"conc": data["conc"], "wls": wls_s, "sample": s_specs,
                                         "blank": b_specs, "exp": exp_s})
                 wls = row_spectra[0]["wls"]
-                ref_row = max(row_spectra, key=lambda r: r["conc"])
-                E = build_reference_emission(np.mean(ref_row["sample"], axis=0), np.mean(ref_row["blank"], axis=0))
+                emis_mask = (wls >= fluor["peak_wl"] - fluor["fwhm"] / 2) & (wls <= fluor["peak_wl"] + fluor["fwhm"] / 2)
+                ref_index, E, auc_E = select_reference_emission(
+                    wls,
+                    [
+                        (
+                            f"#{index + 1} ({row['conc']:g}; "
+                            f"sample={','.join(Path(path).name for path in data['sample'])}; "
+                            f"blank={','.join(Path(path).name for path in data['blank'])})",
+                            np.mean(row["sample"], axis=0),
+                            np.mean(row["blank"], axis=0),
+                        )
+                        for index, (row, data) in enumerate(zip(row_spectra, std_data))
+                    ],
+                    emis_mask,
+                )
+                ref_row = row_spectra[ref_index]
 
                 B_ref = np.mean(ref_row["blank"], axis=0)
                 sm = (wls > 460) & (wls < 520)
@@ -805,9 +848,6 @@ class FSSA_GUI:
                     lo, _ = default_unmix_window(fluor["peak_wl"])
                 hi = fluor["peak_wl"] + 90.0
                 win_mask = (wls >= lo) & (wls <= hi)
-                emis_mask = (wls >= fluor["peak_wl"] - fluor["fwhm"] / 2) & (wls <= fluor["peak_wl"] + fluor["fwhm"] / 2)
-                auc_E = emission_auc(wls, E, emis_mask)
-                if auc_E <= 0: raise RuntimeError("Reference emission AUC <= 0; check fluorophore/window.")
 
                 per_row = []
                 for r in row_spectra:

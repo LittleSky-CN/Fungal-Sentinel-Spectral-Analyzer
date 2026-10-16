@@ -30,6 +30,75 @@ def emission_auc(wavelengths: np.ndarray, ref_emission: np.ndarray, emission_mas
     order = np.argsort(w)
     return float(np_trapz(e[order], w[order]))
 
+def select_reference_emission(
+    wavelengths: np.ndarray,
+    candidates: list[tuple[str, np.ndarray, np.ndarray]],
+    emission_mask: np.ndarray,
+) -> tuple[int, np.ndarray, float]:
+    """Select the standard with the strongest positive measured emission in-band."""
+    wavelengths = np.asarray(wavelengths, dtype=float)
+    emission_mask = np.asarray(emission_mask, dtype=bool)
+    if wavelengths.ndim != 1 or emission_mask.shape != wavelengths.shape:
+        raise ValueError("Wavelengths and emission mask must be matching one-dimensional arrays")
+
+    best: tuple[int, np.ndarray, float] | None = None
+    aucs = []
+    strongest_peak: tuple[str, float, float] | None = None
+    candidate_details = []
+    visible_mask = (wavelengths >= 400.0) & (wavelengths <= 700.0)
+    for index, (label, sample_mean, blank_mean) in enumerate(candidates):
+        sample_mean = np.asarray(sample_mean, dtype=float)
+        blank_mean = np.asarray(blank_mean, dtype=float)
+        if sample_mean.shape != wavelengths.shape or blank_mean.shape != wavelengths.shape:
+            raise ValueError(f"Standard {label} spectrum does not match the wavelength array")
+        net = sample_mean - blank_mean
+        emission = np.clip(net, 0.0, None)
+        auc = emission_auc(wavelengths, emission, emission_mask)
+        positive_count = int(np.count_nonzero(net[emission_mask] > 0))
+        band_count = int(np.count_nonzero(emission_mask))
+        sample_level = float(np.mean(sample_mean[emission_mask])) if band_count else 0.0
+        blank_level = float(np.mean(blank_mean[emission_mask])) if band_count else 0.0
+        aucs.append(f"{label}: {auc:.6g}")
+        candidate_details.append(
+            f"{label}: sample/blank mean={sample_level:.6g}/{blank_level:.6g}, "
+            f"sample>blank={positive_count}/{band_count} points"
+        )
+        if auc > 0 and (best is None or auc > best[2]):
+            best = (index, emission, auc)
+        if np.any(visible_mask):
+            visible_indices = np.flatnonzero(visible_mask)
+            peak_index = visible_indices[np.argmax(emission[visible_mask])]
+            peak = (label, float(wavelengths[peak_index]), float(emission[peak_index]))
+            if strongest_peak is None or peak[2] > strongest_peak[2]:
+                strongest_peak = peak
+
+    if best is None:
+        band = wavelengths[emission_mask]
+        if band.size:
+            window = f"{band.min():.1f}-{band.max():.1f} nm"
+        else:
+            window = "empty wavelength window"
+        if strongest_peak is not None and strongest_peak[2] > 0:
+            peak_label, peak_wavelength, peak_signal = strongest_peak
+            peak_diagnostic = (
+                f" Strongest positive blank-subtracted peak is at {peak_wavelength:.1f} nm "
+                f"(standard {peak_label}, signal {peak_signal:.6g})."
+            )
+            if not emission_mask.any() or not np.any(
+                (wavelengths == peak_wavelength) & emission_mask
+            ):
+                peak_diagnostic += " It is outside the selected emission window."
+        else:
+            peak_diagnostic = " No positive blank-subtracted signal was found from 400 to 700 nm."
+        raise ValueError(
+            f"No standard has positive reference emission in {window}."
+            f"{peak_diagnostic} Check the selected fluorophore/window, "
+            f"standard sample/blank assignments, and concentration labels. "
+            f"Measured AUCs: {', '.join(aucs) or 'none'}. "
+            f"In-band levels: {'; '.join(candidate_details) or 'none'}."
+        )
+    return best
+
 def unmix_spectrum(sample: np.ndarray, ref_emission: np.ndarray, blank: np.ndarray,
                    window_mask: np.ndarray) -> Dict[str, float]:
     """Solve sample = α·E + s·B + k over window_mask by linear least squares."""

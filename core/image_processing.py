@@ -9,27 +9,69 @@ from typing import Dict, List, Tuple, Optional
 
 # 【新增】导入类型定义以消除 Pylance 警告
 from .calibration import KnownWavelength, PeakResult
+from config import DEFAULT_PARAMS
 
 np_trapz = np.trapezoid if hasattr(np, 'trapezoid') else np.trapz
 
 np_trapz = np.trapezoid if hasattr(np, 'trapezoid') else np.trapz
+
+DEFAULT_BLACK_LEVEL = float(DEFAULT_PARAMS["black_level"])
+
+
+def _rational_to_float(value) -> float:
+    if isinstance(value, (tuple, list)) and len(value) == 2:
+        numerator, denominator = value
+        denominator = float(denominator)
+        if denominator == 0:
+            raise ValueError("Invalid TIFF rational with a zero denominator")
+        return float(numerator) / denominator
+    return float(value)
+
+
+def _black_level_from_page(page) -> float:
+    tag = page.tags.get(50714)
+    if tag is None:
+        return DEFAULT_BLACK_LEVEL
+
+    values = tag.value
+    if tag.dtype == 5:
+        flattened = np.asarray(values, dtype=np.float64).reshape(-1)
+        if flattened.size >= 2 and flattened.size % 2 == 0:
+            denominators = flattened[1::2]
+            valid = denominators != 0
+            if np.any(valid):
+                return float(np.mean(flattened[::2][valid] / denominators[valid]))
+        raise ValueError("Invalid DNG BlackLevel rational values")
+
+    flattened = np.asarray(values, dtype=np.float64).reshape(-1)
+    if not flattened.size:
+        raise ValueError("DNG BlackLevel tag is empty")
+    return float(np.mean(flattened))
+
 
 def get_exposure_time(path: str | Path) -> float:
-    try:
-        with tiff.TiffFile(str(path)) as tif:
-            page = tif.pages[0]
-            if 33434 in page.tags:
-                val = page.tags[33434].value
-                if isinstance(val, tuple) and len(val) == 2:
-                    return float(val[0]) / float(val[1]) if val[1] != 0 else 1.0
-                return float(val)
-    except Exception:
-        pass
-    return 1.0
+    with tiff.TiffFile(str(path)) as tif:
+        page = tif.pages[0]
+        exposure_tag = page.tags.get(33434)
+        exposure = exposure_tag.value if exposure_tag is not None else None
+        if exposure is None:
+            exif_tag = page.tags.get(34665)
+            exif = exif_tag.value if exif_tag is not None else {}
+            if isinstance(exif, dict):
+                exposure = exif.get("ExposureTime")
+        if exposure is None:
+            return 1.0
+        seconds = _rational_to_float(exposure)
+        if seconds <= 0:
+            raise ValueError(f"Invalid exposure time in {path}")
+        return seconds
 
-def read_dng_linear_rgb(path: str | Path, black_level: float = 64.0) -> Tuple[np.ndarray, float]:
+def read_dng_linear_rgb(path: str | Path, black_level: Optional[float] = None) -> Tuple[np.ndarray, float]:
     path = Path(path)
     raw = tiff.imread(str(path)).astype(np.float32)
+    if black_level is None:
+        with tiff.TiffFile(str(path)) as tif:
+            black_level = _black_level_from_page(tif.pages[0])
     raw = np.clip(raw - black_level, 0, None)
     exp_time = get_exposure_time(path)
     if exp_time <= 0: exp_time = 1.0

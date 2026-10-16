@@ -8,6 +8,100 @@ import numpy as np
 from scipy.interpolate import interp1d
 from config import DEFAULT_PARAMS
 
+
+def correct_by_response(signal: np.ndarray, response: np.ndarray,
+                        floor_fraction: float = 0.20) -> np.ndarray:
+    """Correct signal only where the calibrated channel response is reliable."""
+    signal = np.asarray(signal, dtype=np.float64)
+    response = np.asarray(response, dtype=np.float64)
+    if signal.shape != response.shape:
+        raise ValueError("Signal and response arrays must have matching shapes")
+    if not np.all(np.isfinite(response)) or np.any(response < 0):
+        raise ValueError("Response values must be finite and non-negative")
+    if not 0.0 <= floor_fraction < 1.0:
+        raise ValueError("Response floor fraction must be in [0, 1)")
+
+    max_response = float(np.max(response)) if response.size else 0.0
+    if max_response <= 0.0:
+        raise ValueError("No positive calibrated response is available")
+
+    floor = max(1e-9, max_response * floor_fraction)
+    reliable = response > floor
+    corrected = np.zeros_like(signal)
+    np.divide(signal, response, out=corrected, where=reliable)
+    return corrected
+
+
+def remove_isolated_spikes(spectrum: np.ndarray, radius: int = 2,
+                           sigma_threshold: float = 4.5,
+                           minimum_fraction: float = 0.02) -> np.ndarray:
+    """Replace isolated spectral outliers with the local neighbor median."""
+    values = np.asarray(spectrum, dtype=np.float64)
+    if values.ndim != 1:
+        raise ValueError("Spectrum must be one-dimensional")
+    if radius < 1 or sigma_threshold <= 0 or minimum_fraction < 0:
+        raise ValueError("Invalid isolated-spike filter parameters")
+    if not np.all(np.isfinite(values)):
+        raise ValueError("Spectrum values must be finite")
+    if values.size < 2 * radius + 2:
+        return values.copy()
+
+    result = values.copy()
+    amplitude_floor = float(np.max(np.abs(values))) * minimum_fraction
+    for index in range(radius, values.size - radius):
+        neighbors = np.concatenate((values[index - radius:index], values[index + 1:index + radius + 1]))
+        local_median = float(np.median(neighbors))
+        mad = float(np.median(np.abs(neighbors - local_median)))
+        threshold = max(sigma_threshold * 1.4826 * mad, amplitude_floor)
+        if abs(values[index] - local_median) > threshold:
+            result[index] = local_median
+    return result
+
+
+def analyze_blank_subtracted_replicates(
+    blank_profile: np.ndarray,
+    sample_profiles: np.ndarray,
+    wavelengths: np.ndarray,
+    area_mask: np.ndarray,
+    response: np.ndarray | None = None,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Apply Android Step 3 background, response-floor, spike, and area processing."""
+    blank = np.asarray(blank_profile, dtype=np.float64)
+    samples = np.asarray(sample_profiles, dtype=np.float64)
+    wavelengths = np.asarray(wavelengths, dtype=np.float64)
+    area_mask = np.asarray(area_mask, dtype=bool)
+    if samples.ndim != 2 or samples.shape[0] == 0:
+        raise ValueError("At least one one-dimensional sample profile is required")
+    if blank.ndim != 1 or samples.shape[1] != blank.size:
+        raise ValueError("Blank and sample profiles must have matching lengths")
+    if wavelengths.shape != blank.shape or area_mask.shape != blank.shape:
+        raise ValueError("Wavelengths and area mask must match the profile length")
+    if not np.all(np.isfinite(blank)) or not np.all(np.isfinite(samples)):
+        raise ValueError("Blank and sample profiles must be finite")
+    if not np.all(np.isfinite(wavelengths)):
+        raise ValueError("Wavelengths must be finite")
+    if response is not None:
+        response = np.asarray(response, dtype=np.float64)
+        if response.shape != blank.shape:
+            raise ValueError("Response must match the profile length")
+
+    net_replicates = np.clip(samples - blank, 0.0, None)
+    areas = np.zeros(net_replicates.shape[0], dtype=np.float64)
+    for index, net in enumerate(net_replicates):
+        corrected = correct_by_response(net, response) if response is not None else net
+        cleaned = remove_isolated_spikes(corrected)
+        if np.count_nonzero(area_mask) > 1:
+            x = wavelengths[area_mask]
+            y = cleaned[area_mask]
+            order = np.argsort(x)
+            areas[index] = np.trapezoid(y[order], x[order]) if hasattr(np, "trapezoid") else np.trapz(y[order], x[order])
+
+    mean_net = np.mean(net_replicates, axis=0)
+    mean_corrected = correct_by_response(mean_net, response) if response is not None else mean_net
+    mean_spectrum = remove_isolated_spikes(mean_corrected)
+    return areas, mean_spectrum
+
+
 @dataclass
 class KnownWavelength:
     name: str
