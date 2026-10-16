@@ -1,7 +1,7 @@
 # gui/details_window.py
-"""FSSA v1.4.4 Detailed Analysis Report.
+"""FSSA v1.4.5 Detailed Analysis Report.
 Tab 2 fixed: Figure 4a-4d with ONE continuous pointwise-fused curve
-(weights a+b+c=1, logistic handoff, no cross-wavelength smoothing).
+(weights response-proportional, sum = 1, no cross-wavelength smoothing).
 """
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
@@ -18,7 +18,6 @@ from core.image_processing import normalize_for_display
 try:
     from core.fusion import channel_weights, auto_handoffs, fuse_pointwise
 except Exception:
-    def _logistic(x): return 1.0 / (1.0 + np.exp(-np.clip(x, -500.0, 500.0)))
     def auto_handoffs(w, rb, rg, rr, default_bg=483.0, default_gr=577.0):
         h_bg, h_gr = default_bg, default_gr
         m = (rb > 0) & (rg > 0)
@@ -28,9 +27,9 @@ except Exception:
         if np.any(m2):
             h_gr = float(w[int(np.argmin(np.where(m2, np.abs(rg - rr), np.inf)))])
         return h_bg, h_gr
-    def channel_weights(w, h_bg, h_gr, width=15.0):
-        t1 = _logistic((w - h_bg) / width); t2 = _logistic((w - h_gr) / width)
-        return 1.0 - t1, t1 * (1.0 - t2), t2
+    def channel_weights(rb, rg, rr, eps=1e-6):
+        total = rb + rg + rr + eps
+        return rb / total, rg / total, rr / total
     def fuse_pointwise(weights, curves):
         (wB, wG, wR), (cB, cG, cR) = weights, curves
         return wB * cB + wG * cG + wR * cR
@@ -64,7 +63,7 @@ def _safe_div(a, b):
 class DetailsWindow:
     def __init__(self, parent, cache1, cache2, cache3, cache4, mapping):
         self.win = tk.Toplevel(parent)
-        self.win.title("FSSA Detailed Analysis Report & Parameters (v1.4.4)")
+        self.win.title("FSSA v1.4.5 — Detailed Analysis Report & Parameters")
         self.win.geometry("2000x2000")
         if _THEME_ON:
             _theme.tint(self.win)
@@ -305,8 +304,9 @@ class DetailsWindow:
         else:
             cRv = cGv = cBv = None
 
+        # 交叉点仅作诊断读数输出；融合权重改用响应比例归一 w_c = resp_c / Σresp_c
         h_bg, h_gr = auto_handoffs(wv, bv, gv, rv)
-        wB, wG, wR = channel_weights(wv, h_bg, h_gr, width=15.0)
+        wB, wG, wR = channel_weights(bv, gv, rv)
         fused = fuse_pointwise((wB, wG, wR), (cBv, cGv, cRv)) if pos_avail else None
 
         self.fig2 = Figure(figsize=(15, 24), dpi=100)
@@ -356,11 +356,11 @@ class DetailsWindow:
         ax4d.plot(wv, wB, '-', color=ch["blue"], lw=2.5, label='w_B(λ)')
         ax4d.plot(wv, wG, '-', color=ch["green"], lw=2.5, label='w_G(λ)')
         ax4d.plot(wv, wR, '-', color=ch["red"], lw=2.5, label='w_R(λ)')
-        ax4d.axvline(h_bg, ls=':', color=ink, label=f'B→G handoff {h_bg:.1f} nm')
-        ax4d.axvline(h_gr, ls='--', color=ink, alpha=0.7, label=f'G→R handoff {h_gr:.1f} nm')
+        ax4d.axvline(h_bg, ls=':', color=ink, label=f'B→G responsivity crossing {h_bg:.1f} nm')
+        ax4d.axvline(h_gr, ls='--', color=ink, alpha=0.7, label=f'G→R responsivity crossing {h_gr:.1f} nm')
         ax4d.set_ylim(-0.02, 1.05)
         ax4d.set_xlabel("Wavelength (nm)", fontsize=12); ax4d.set_ylabel("Weight", fontsize=11)
-        ax4d.set_title("Figure 4d: Per-wavelength channel weights (a+b+c=1, continuous handoff)", fontsize=13)
+        ax4d.set_title("Figure 4d: Per-wavelength channel weights (response-proportional, sum = 1)", fontsize=13)
         ax4d.legend(fontsize=9, loc='upper right'); ax4d.grid(True, linestyle=':', alpha=0.5)
 
         self.fig2.tight_layout()
@@ -383,12 +383,12 @@ class DetailsWindow:
             f"[Formulas]\n"
             f"  resp_c(λ) = Lamp_c(λ) / SPD_true(λ)        (Lamp = SPD calibration source)\n"
             f"  Corrected_c(λ) = Pos_c(λ) / resp_c(λ)      (Pos = positioning LEDs, independent)\n"
-            f"  w_B=1-t1, w_G=t1(1-t2), w_R=t2;  t=σ((λ-h)/15nm)\n"
+            f"  w_c(λ) = resp_c(λ) / (resp_R + resp_G + resp_B)(λ)   -> Σ w_c = 1 pointwise\n"
             f"  Fused(λ) = w_B·Corrected_B + w_G·Corrected_G + w_R·Corrected_R\n\n"
             f"[Effective Band] {wv[0]:.1f} - {wv[-1]:.1f} nm | masked pixels: {len(wls)-np.sum(valid)}/{len(wls)}\n"
             f"[SPD Threshold Ratio] {self.cache2.get('spd_threshold_ratio', 0.05)}\n"
             f"[Shots Averaged] SPD lamp: {self.cache2.get('lamp_R_n', 1)} | Positioning: see Step 1\n"
-            f"[Handoff Wavelengths] B→G: {h_bg:.1f} nm | G→R: {h_gr:.1f} nm\n"
+            f"[Responsivity Crossings (diagnostic only)] B→G: {h_bg:.1f} nm | G→R: {h_gr:.1f} nm\n"
             f"[Cross-channel Agreement] {agree_txt}   <- 三通道互相同意的量化证据\n"
             f"[Fused Curve] peak {fused_pk:.4f} a.u./s @ {fused_wl:.1f} nm\n\n"
             f"[Per-channel Response Peaks (absolute)]\n"

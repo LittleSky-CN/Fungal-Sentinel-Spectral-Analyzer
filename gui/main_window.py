@@ -1,5 +1,5 @@
 # gui/main_window.py
-"""Main GUI Window for FSSA v1.4.4 (Spectral Unmixing LoD + Weighted Fusion + Turbidity).
+"""Main GUI Window for FSSA v1.4.5 (Spectral Unmixing LoD + Weighted Fusion + Turbidity).
 Theme-aware (gui/theme.py optional): neon-pop look when enabled, classic look otherwise.
 """
 import re
@@ -25,6 +25,7 @@ from core.calibration import (
     analyze_blank_subtracted_replicates, correct_by_response, remove_isolated_spikes,
 )
 from core.quantification import calculate_concentration
+from core.curve_preset import load_curve_preset as read_curve_preset, save_curve_preset
 from core.unmixing import (unmix_spectrum, select_reference_emission,
                            default_unmix_window, slope_t_statistic)
 from gui.widgets import MultiFileSelector
@@ -53,7 +54,7 @@ class FSSA_GUI:
         self.is_turbidity_mode = (analysis_mode == "turbidity")
 
         title_suffix = "TURBIDITY" if self.is_turbidity_mode else analysis_mode.upper()
-        self.root.title(f"Fungal Sentinel Spectral Analyzer (FSSA) v1.4.4 [{title_suffix}] - iGEM 2026")
+        self.root.title(f"Fungal Sentinel Spectral Analyzer (FSSA) v1.4.5 [{title_suffix}] - iGEM 2026")
         self.root.geometry("1600x950")
         self.root.minsize(1400, 900)
 
@@ -71,6 +72,7 @@ class FSSA_GUI:
         self.cache_step2 = {}
         self.cache_step3 = {}
         self.cache_step4 = {}
+        self.curve_preset = None
         
         self.turbidity_window = None
         self._lod_headline = None
@@ -156,10 +158,10 @@ class FSSA_GUI:
         if _THEME_ON:
             self.banner = _theme.StepBanner(left_frame)
             self.banner.pack(fill=tk.X, pady=(10, 0))
-            ttk.Label(left_frame, text=f"FSSA v1.4.4  [{self.analysis_mode.upper()}]",
+            ttk.Label(left_frame, text=f"FSSA v1.4.5  [{self.analysis_mode.upper()}]",
                       style="Title.TLabel").pack(pady=(6, 0))
         else:
-            ttk.Label(left_frame, text=f"FSSA v1.4.4\n({self.analysis_mode.upper()})",
+            ttk.Label(left_frame, text=f"FSSA v1.4.5\n({self.analysis_mode.upper()})",
                       font=("Arial", 14, "bold")).pack(pady=15)
 
         self.content_frame = ttk.Frame(left_frame)
@@ -177,6 +179,22 @@ class FSSA_GUI:
             self._setup_page4()
 
         self.max_steps = 3 if self.is_turbidity_mode else 4
+
+        self.curve_preset_frame = ttk.Frame(left_frame)
+        preset_buttons = ttk.Frame(self.curve_preset_frame)
+        preset_buttons.pack(fill=tk.X)
+        self._btn(preset_buttons, "Save Curve Preset", kind="yellow",
+                  command=self.export_curve_preset).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(0, 2))
+        self._btn(preset_buttons, "Load Curve Preset", kind="yellow",
+                  command=self.load_curve_preset).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(2, 0))
+        self.btn_clear_curve_preset = self._btn(
+            self.curve_preset_frame, "Clear Loaded Preset", kind="pale",
+            command=self.clear_curve_preset)
+        self.btn_clear_curve_preset.pack(fill=tk.X, pady=(3, 0))
+        self.btn_clear_curve_preset.config(state="disabled")
+        self.lbl_curve_preset = self._sub_label(
+            self.curve_preset_frame, "No curve preset loaded", wraplength=460)
+        self.lbl_curve_preset.pack(anchor=tk.W, pady=(2, 0))
 
         nav_frame = ttk.Frame(left_frame)
         nav_frame.pack(fill=tk.X, padx=10, pady=15)
@@ -208,7 +226,7 @@ class FSSA_GUI:
 
         self.fig = Figure(figsize=(8, 5), dpi=100)
         self.ax = self.fig.add_subplot(111)
-        self.ax.set_title("Welcome to FSSA v1.4.4\nPlease proceed with Step 1: Positioning.")
+        self.ax.set_title("Welcome to FSSA v1.4.5\nPlease proceed with Step 1: Positioning.")
         self.ax.axis('off')
         self._style_fig(self.fig)
         self.canvas_plot = FigureCanvasTkAgg(self.fig, master=right_frame)
@@ -394,6 +412,10 @@ class FSSA_GUI:
         self.current_page = page_num
         for p in [self.page1, self.page2, self.page3, self.page4]: p.pack_forget()
         getattr(self, f"page{page_num}").pack(fill=tk.BOTH, expand=True)
+        if not self.is_turbidity_mode and page_num == 4:
+            self.curve_preset_frame.pack(fill=tk.X, padx=10, pady=(4, 0), before=self.btn_prev.master)
+        else:
+            self.curve_preset_frame.pack_forget()
         self.lbl_page_num.config(text=f"Step {page_num} / {self.max_steps}")
         self.btn_prev.config(state="normal" if page_num > 1 else "disabled")
         self.btn_next.config(state="normal" if page_num < self.max_steps else "disabled")
@@ -489,6 +511,59 @@ class FSSA_GUI:
             self.ax.legend(); self._style_fig(self.fig); self.fig.tight_layout(); self.canvas_plot.draw()
         except Exception as e:
             messagebox.showerror("Error", f"Failed to load SPD params: {str(e)}")
+
+    def export_curve_preset(self):
+        if not self.cache_step4:
+            messagebox.showwarning("Warning", "Build a Step 4 curve before saving a preset.")
+            return
+        file_path = filedialog.asksaveasfilename(
+            title="Save Curve Preset", initialfile="concentration_curve.json",
+            defaultextension=".json", filetypes=[("JSON Preset", "*.json")])
+        if not file_path:
+            return
+        try:
+            save_curve_preset(
+                file_path, self.cache_step4, self.analysis_mode,
+                self.cache_step4.get("fluorophore", self.current_fluorophore))
+            messagebox.showinfo("Success", f"Curve preset saved to:\n{file_path}")
+        except (OSError, TypeError, ValueError, KeyError) as e:
+            messagebox.showerror("Error", f"Could not save curve preset:\n{e}")
+
+    def load_curve_preset(self):
+        file_path = filedialog.askopenfilename(
+            title="Load Curve Preset", filetypes=[("JSON Preset", "*.json")])
+        if not file_path:
+            return
+        try:
+            preset = read_curve_preset(file_path, self.analysis_mode)
+            if preset["fluorophore"] not in FLUOROPHORES:
+                raise ValueError("The preset fluorophore is not available in this version.")
+            self.curve_preset = preset
+            self.cache_step4 = {}
+            self.current_fluorophore = preset["fluorophore"]
+            if not self.is_turbidity_mode:
+                self.fluor_combo.set(self.current_fluorophore)
+                self.fluor_combo.config(state="disabled")
+            self.btn_calc_conc.config(text="Calculate with Curve Preset")
+            self.btn_clear_curve_preset.config(state="normal")
+            self.lbl_curve_preset.config(
+                text=f"Active: {Path(file_path).name} — standard rows ignored; Step 3 blank/sample required")
+            self.log_status(4, "Curve preset loaded; ready for Step 3 sample.", "green")
+            messagebox.showinfo(
+                "Success",
+                "Curve preset loaded. Select the current sample and blank in Step 3, "
+                "then calculate with this saved curve.")
+        except (OSError, TypeError, ValueError, KeyError) as e:
+            messagebox.showerror("Error", f"Could not load curve preset:\n{e}")
+
+    def clear_curve_preset(self):
+        self.curve_preset = None
+        self.btn_calc_conc.config(text="Build Curve & Calculate")
+        self.btn_clear_curve_preset.config(state="disabled")
+        self.lbl_curve_preset.config(text="No curve preset loaded")
+        if not self.is_turbidity_mode:
+            self.fluor_combo.config(state="readonly")
+        self.log_status(4, "Curve preset cleared.", "gray")
 
     # ================= Core Signal Extraction =================
     def _interp_response(self, wavelengths, ch_name):
@@ -793,7 +868,135 @@ class FSSA_GUI:
     def update_std_buttons(self):
         self.btn_add_std.config(state="normal" if len(self.std_rows) < 10 else "disabled")
 
+    def calculate_with_curve_preset(self):
+        preset = self.curve_preset
+        if not preset:
+            return
+        if not self.mapping:
+            messagebox.showwarning("Warning", "Please complete Step 1 & 2 first!")
+            return
+        sample_files = self.sample_selector.get_files()
+        blank_files = self.blank_selector.get_files()
+        if not sample_files or not blank_files:
+            messagebox.showerror("Error", "A current Step 3 blank and sample are required.")
+            return
+
+        self.log_status(4, "Calculating with curve preset...", "orange")
+        try:
+            fluor = FLUOROPHORES[preset["fluorophore"]]
+            concentrations = preset["concentrations"]
+            means = preset["means"]
+            stds = preset["stds"]
+            metric_mode = preset["metric_mode"]
+            unmix_info = None
+
+            if metric_mode == "unmixing":
+                sample_wls, sample_specs = self.get_raw_channel_spectra(sample_files, fluor)
+                blank_wls, blank_specs = self.get_raw_channel_spectra(blank_files, fluor)
+                if (sample_wls.shape != blank_wls.shape
+                        or not np.allclose(sample_wls, blank_wls, rtol=0, atol=1e-8)):
+                    raise ValueError("Current sample and blank wavelength grids do not match.")
+                reference = preset["reference_emission"]
+                emission = np.interp(
+                    sample_wls, reference["wavelengths"], reference["emission"],
+                    left=0.0, right=0.0)
+                lo, hi = reference["window_nm"]
+                window_mask = (sample_wls >= lo) & (sample_wls <= hi)
+                if np.count_nonzero(window_mask) < 3:
+                    raise ValueError("Current wavelength grid has fewer than three points in the saved unmixing window.")
+                blank_mean = np.mean(blank_specs, axis=0)
+                unmixed = [unmix_spectrum(spec, emission, blank_mean, window_mask)
+                           for spec in sample_specs]
+                sample_metrics = [item["alpha"] * reference["auc"] for item in unmixed]
+                sample_mean_area = float(np.mean(sample_metrics))
+                unmix_info = {
+                    "window": (lo, hi),
+                    "ref_conc": reference["ref_conc"],
+                    "auc_E": reference["auc"],
+                    "per_row": [],
+                    "alpha": float(np.mean([item["alpha"] for item in unmixed])),
+                    "u_s": float(np.mean([item["scatter_scale"] for item in unmixed])),
+                    "u_k": float(np.mean([item["offset"] for item in unmixed])),
+                    "wls": sample_wls,
+                    "E": emission,
+                    "B": blank_mean,
+                    "sample_mean_spec": np.mean(sample_specs, axis=0),
+                }
+            else:
+                sample_areas, _, _, _ = self.get_net_areas_batch(blank_files, sample_files, fluor)
+                sample_mean_area = float(np.mean(sample_areas))
+
+            calc_result = dict(preset["fit"])
+            calc_result.update({
+                "mode": self.analysis_mode,
+                "regression_method": preset["regression_method"],
+                "sample_mean_area": sample_mean_area,
+                "sample_conc": (sample_mean_area - calc_result["intercept"]) / calc_result["slope"],
+            })
+            t_stat = slope_t_statistic(calc_result["r_value"], len(concentrations))
+            self.cache_step4 = dict(calc_result)
+            self.cache_step4.update({
+                "concentrations": concentrations,
+                "means": means,
+                "stds": stds,
+                "metric_mode": metric_mode,
+                "fluorophore": preset["fluorophore"],
+                "t_stat": t_stat,
+                "unmix": unmix_info,
+                "blocks": [],
+                "scatter_peak_wl": float("nan"),
+            })
+
+            self.txt_result.insert(
+                tk.END,
+                f"\n=== Step 4: Curve Preset ===\n"
+                f"Preset fluorophore: {preset['fluorophore']}\n"
+                f"Quantification metric: {metric_mode.upper()}\n"
+                f"Regression method: {preset['regression_method'].upper()}\n"
+                f"Curve: I = {calc_result['slope']:.6g}*C + {calc_result['intercept']:.6g} "
+                f"(R²={calc_result['r_squared']:.4f})\n"
+                f"Sample metric: {sample_mean_area:.6g}\n"
+                f"PREDICTED CONCENTRATION: {calc_result['sample_conc']:.4g} (a.u.)\n")
+            self.txt_result.see(tk.END)
+            self.log_status(4, "Done with saved curve preset.", "green")
+
+            colors = self._c4_colors()
+            self.ax.clear()
+            self.ax.errorbar(
+                concentrations, means, yerr=stds, fmt="o", color=colors["std"],
+                capsize=5, label="Preset standards (Mean±SD)", zorder=5,
+                ecolor=colors["std_err"])
+            x_line = np.linspace(min(concentrations) * 0.8, max(concentrations) * 1.2, 100)
+            self.ax.plot(
+                x_line, calc_result["slope"] * x_line + calc_result["intercept"],
+                "--", color=colors["fit"], linewidth=2,
+                label=f"Fit ({preset['regression_method'].upper()}, R²={calc_result['r_squared']:.3f})")
+            self.ax.scatter(
+                [calc_result["sample_conc"]], [sample_mean_area], color=colors["sample"],
+                marker="*", s=150, label=f"Sample (Conc: {calc_result['sample_conc']:.3f})",
+                zorder=6, edgecolors=colors["sample_edge"])
+            if "lod_conc" in calc_result:
+                self.ax.axvline(x=calc_result["lod_conc"], color=colors["lod"],
+                                linestyle="-.", alpha=0.6, label="LoD")
+                self.ax.axvline(x=calc_result["loq_conc"], color=colors["loq"],
+                                linestyle=":", alpha=0.6, label="LoQ")
+            self.ax.legend(loc="upper right", fontsize=10, framealpha=0.9)
+            self.set_chart_title("Step 4: Standard Curve & Concentration (Preset)")
+            self.ax.set_xlabel("Concentration (a.u.)", fontsize=11)
+            self.ax.set_ylabel("Unmixed Net Area" if metric_mode == "unmixing" else "Net Fluorescence Area",
+                               fontsize=11)
+            self.ax.grid(True, linestyle=":", alpha=0.7)
+            self._style_fig(self.fig)
+            self.fig.tight_layout()
+            self.canvas_plot.draw()
+        except Exception as e:
+            self.log_status(4, f"Error: {e}", "red")
+            messagebox.showerror("Error", str(e))
+
     def calculate_concentration(self):
+        if self.curve_preset is not None:
+            self.calculate_with_curve_preset()
+            return
         if not self.mapping: messagebox.showwarning("Warning", "Please complete Step 1 & 2 first!"); return
         std_data = []
         for row in self.std_rows:
@@ -980,7 +1183,8 @@ class FSSA_GUI:
             self.cache_step4 = calc_result
             self.cache_step4.update({"concentrations": concentrations, "means": means, "stds": stds,
                                      "metric_mode": metric_mode, "t_stat": t_stat, "unmix": unmix_info,
-                                     "blocks": block_stats, "scatter_peak_wl": scatter_wl})
+                                     "blocks": block_stats, "scatter_peak_wl": scatter_wl,
+                                     "fluorophore": self.current_fluorophore})
 
             pc = self._c4_colors()
             self.ax.clear()

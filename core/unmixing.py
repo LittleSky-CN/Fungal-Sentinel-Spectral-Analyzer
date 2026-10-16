@@ -1,5 +1,5 @@
 # core/unmixing.py
-"""Spectral unmixing for low-LoD quantification (v1.4.4).
+"""Spectral unmixing for low-LoD quantification (v1.4.5).
 Model (from LOD_report_A_20260905, mentor-approved):
     sample(λ) = α·E(λ) + s·B(λ) + k
   E(λ) : reference fluorophore emission shape = (highest standard − its blank)

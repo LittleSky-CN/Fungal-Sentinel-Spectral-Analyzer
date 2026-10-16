@@ -1,13 +1,58 @@
 # core/fusion.py
-"""Pointwise channel-weight fusion (NO cross-wavelength smoothing)."""
+"""Pointwise channel-weight fusion (NO cross-wavelength smoothing).
+
+Fusion rule (identical on Python FSSA and Android MycoSpec)
+-----------------------------------------------------------
+Channel weights use RESPONSE-PROPORTIONAL NORMALISATION:
+
+    S_c(λ)   = resp_R(λ) + resp_G(λ) + resp_B(λ)
+    w_c(λ)   = resp_c(λ) / (S_c(λ) + eps)          c in {B, G, R}
+    Fused(λ) = w_B·Corrected_B + w_G·Corrected_G + w_R·Corrected_R
+
+so that sum_c w_c(λ) = 1 at every wavelength, and each wavelength is carried
+predominantly by whichever channel is genuinely most sensitive there. This is
+the same expression implemented in Android
+(app/src/main/java/org/fungalsentinel/app/analysis/SpectralResponseCalibrator.kt),
+so both front-ends return numerically identical fused spectra for the same DNG.
+
+Note on auto_handoffs(): the B→G / G→R crossing wavelengths are NOT used to
+build the weights any more. They are retained purely as a diagnostic readout of
+where two adjacent channels have equal absolute responsivity (drawn on
+Figure 4d and quoted in the parameter panel).
+"""
 import numpy as np
 
-def _logistic(x):
-    return 1.0 / (1.0 + np.exp(-np.clip(x, -500.0, 500.0)))
+EPS = 1e-6
+
+
+def channel_weights(resp_B, resp_G, resp_R, eps=EPS):
+    """Response-proportional weights, w_B + w_G + w_R = 1 pointwise.
+
+    w_c(λ) = resp_c(λ) / (resp_R(λ) + resp_G(λ) + resp_B(λ) + eps)
+
+    Wavelengths where every channel response is zero (i.e. outside the
+    SPD/range mask) collapse to w = 0 for all three channels, which leaves the
+    fused curve at zero there — exactly what the corrected spectra already are.
+    """
+    resp_B = np.asarray(resp_B, dtype=float)
+    resp_G = np.asarray(resp_G, dtype=float)
+    resp_R = np.asarray(resp_R, dtype=float)
+    total = resp_B + resp_G + resp_R + eps
+    return resp_B / total, resp_G / total, resp_R / total
+
 
 def auto_handoffs(wavelengths, resp_B, resp_G, resp_R,
                   default_bg=483.0, default_gr=577.0):
-    """B→G / G→R handoff = response-curve crossing points (pointwise search)."""
+    """DIAGNOSTIC ONLY: B→G / G→R responsivity crossings (pointwise search).
+
+    Returns the two wavelengths where adjacent channel responses are closest to
+    each other. These are reported as figures of merit; they no longer drive
+    the fusion weights.
+    """
+    wavelengths = np.asarray(wavelengths, dtype=float)
+    resp_B = np.asarray(resp_B, dtype=float)
+    resp_G = np.asarray(resp_G, dtype=float)
+    resp_R = np.asarray(resp_R, dtype=float)
     h_bg, h_gr = default_bg, default_gr
     m = (resp_B > 0) & (resp_G > 0)
     if np.any(m):
@@ -19,14 +64,6 @@ def auto_handoffs(wavelengths, resp_B, resp_G, resp_R,
         h_gr = float(wavelengths[int(np.argmin(d2))])
     return h_bg, h_gr
 
-def channel_weights(wavelengths, h_bg, h_gr, width=15.0):
-    """Continuous weights, sum=1, computed per wavelength (no smoothing)."""
-    t1 = _logistic((wavelengths - h_bg) / width)   # B→G handoff
-    t2 = _logistic((wavelengths - h_gr) / width)   # G→R handoff
-    w_B = 1.0 - t1
-    w_G = t1 * (1.0 - t2)
-    w_R = t2
-    return w_B, w_G, w_R
 
 def fuse_pointwise(weights, curves):
     """S(λ) = w_B·B + w_G·G + w_R·R  (pure per-wavelength scalar multiplication)."""

@@ -187,7 +187,7 @@ class SpectralResponseCalibrator:
     # ================= 参数导出与导入（JSON） =================
     def save_params(self, filepath: str):
         data = {
-            "version": "1.4.3",
+            "version": "1.4.5",
             "valid_range": list(self.valid_range),
             "smooth_window": self.smooth_window,
             "spd_threshold_ratio": self.spd_threshold_ratio,
