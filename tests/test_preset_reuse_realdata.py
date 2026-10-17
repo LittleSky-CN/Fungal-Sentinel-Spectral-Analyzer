@@ -21,7 +21,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from config import FLUOROPHORES
+from config import FLUOROPHORES, canonical_fluorophore
 from core.calibration import (
     LinearMapping, SpectralResponseCalibrator, analyze_blank_subtracted_replicates,
     correct_by_response,
@@ -46,7 +46,8 @@ pytestmark = pytest.mark.skipif(
     reason="set FSSA_E2E=1 and mount the 10.15 DNG sample set to run this module",
 )
 
-FLUOROPHORE = "Ypet (Venus variant)"
+# canonical ID（= Android enum name），从表解析而来而不是写死，改 key 不会破测试
+FLUOROPHORE = canonical_fluorophore("Ypet (Venus variant)")
 ANALYSIS_MODE = "lod_iupac"
 SAMPLE = "S"
 BLANK = "B0"

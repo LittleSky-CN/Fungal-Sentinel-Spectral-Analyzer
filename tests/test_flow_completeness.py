@@ -22,8 +22,16 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from config import FLUOROPHORES, canonical_fluorophore, fluorophore_display_name
 from core.calibration import LinearMapping, SpectralResponseCalibrator
 from core.quantification import calculate_concentration as fit_curve
+
+# 荧光素一律用 canonical ID（= Android enum name）。需要给用户看的文字（下拉框、
+# 日志、报告）再从 FLUOROPHORES 里取 display_name。这里不写死具体 key，避免
+# 下次改 key 又全量破一次（之前 assert payload["version"] == "1.4.7" 就吃过亏）。
+YPET = canonical_fluorophore("Ypet (Venus variant)")
+MCHERRY = canonical_fluorophore("mCherry")
+FLUORESCEIN = canonical_fluorophore("Fluorescein (sodium salt)")
 
 
 # ---------------------------------------------------------------------------
@@ -181,7 +189,7 @@ def _make_gui(analysis_mode="legacy"):
     gui.spd_params_path = None
     gui.txt_file = None
     gui.csv_file = None
-    gui.current_fluorophore = "Ypet (Venus variant)"
+    gui.current_fluorophore = YPET
     gui.cache_step1 = {}
     gui.cache_step2 = {}
     gui.cache_step3 = {}
@@ -240,22 +248,24 @@ def _areas_patch(gui, value=3.0):
 # ---------------------------------------------------------------------------
 # Fixture data: a real Step 4 curve preset on disk
 # ---------------------------------------------------------------------------
-def _write_curve_preset(tmp_path, name="curve.json"):
+def _write_curve_preset(tmp_path, name="curve.json", fluorophore=None):
+    """``fluorophore`` 默认写 canonical；传旧显示名可模拟 Python 存量 preset。"""
     concentrations = [0.0, 1.0, 2.0]
     means = [1.0, 3.0, 5.0]
     fit = fit_curve(concentrations, means, 0.0, mode="legacy")
     from core.curve_preset import save_curve_preset
+    fluor = YPET if fluorophore is None else fluorophore
     cache = {
         **fit,
         "concentrations": concentrations,
         "means": means,
         "stds": [0.1, 0.2, 0.3],
         "metric_mode": "legacy",
-        "fluorophore": "Ypet (Venus variant)",
+        "fluorophore": fluor,
         "regression_method": "ols",
     }
     path = tmp_path / name
-    save_curve_preset(str(path), cache, "legacy", "Ypet (Venus variant)")
+    save_curve_preset(str(path), cache, "legacy", fluor)
     return path
 
 
@@ -496,6 +506,7 @@ def test_load_curve_preset_schedules_the_calculation_when_step3_is_ready(
     assert entry["file_name"] == "curve.json"
     assert entry["params"]["n_standards"] == "3"
     assert entry["params"]["metric_mode"] == "legacy"
+    # 溯源/报告是给人看的：必须是本地化显示名，不能是 "YPET" 这种大写串
     assert entry["params"]["fluorophore"] == "Ypet (Venus variant)"
     # the "stopped at the import dialog" dialog must be gone
     assert not gui.messages.infos
@@ -896,9 +907,10 @@ def test_fluor_channel_label_is_inert_without_the_widget():
 def test_fluor_channel_label_follows_the_combo_selection():
     gui = _make_gui()
     gui.lbl_fluor_channel = ConfigProbe()
+    # 下拉框里是 display_name，内部必须存 canonical
     gui.fluor_combo = types.SimpleNamespace(get=lambda: "mCherry")
     mw.FSSA_GUI.on_fluorophore_change(gui, None)
-    assert gui.current_fluorophore == "mCherry"
+    assert gui.current_fluorophore == MCHERRY
     text = gui.lbl_fluor_channel.config_calls[-1][1].get("text", "")
     assert "RED" in text, text
 
@@ -906,7 +918,7 @@ def test_fluor_channel_label_follows_the_combo_selection():
 def test_step3_log_reports_the_analysis_channel():
     """The run log must name the channel, matching what the report Tab 3 shows."""
     gui = _make_gui()
-    gui.current_fluorophore = "mCherry"
+    gui.current_fluorophore = MCHERRY
     gui.blank_selector = types.SimpleNamespace(get_files=lambda: ["blank.dng"])
     gui.sample_selector = types.SimpleNamespace(get_files=lambda: ["sample.dng"])
     gui.txt_result = _ResultText()
@@ -998,3 +1010,162 @@ def test_wheel_target_check_survives_combobox_popdown_paths():
     assert mw.FSSA_GUI._wheel_target_in_region(leaf, top, mid) is True
     assert mw.FSSA_GUI._wheel_target_in_region(leaf, top, object()) is False
     assert mw.FSSA_GUI._wheel_target_in_region(top, top, mid) is False
+
+
+def test_fluorescein_sodium_option_matches_the_requested_parameters():
+    """User-requested dye: emission 520 nm on the green channel, excitation
+    ~494 nm recorded as metadata. The dropdown, the channel label, the
+    calculation and the plot all read ``FLUOROPHORES`` — adding the entry is
+    the whole change, so this pins the entry itself."""
+    from config import FLUOROPHORES
+
+    cfg = FLUOROPHORES.get(FLUORESCEIN)
+    assert cfg is not None, "dye missing from the dropdown source dict"
+    assert cfg["display_name"] == "Fluorescein (sodium salt)"
+    assert cfg["peak_wl"] == 520
+    assert cfg["channel"] == "green"
+    assert cfg["fwhm"] > 0
+    assert cfg["color"] == "green"
+    assert cfg["excitation_nm"] == 494
+
+
+def test_step3_targets_fluorescein_emission_at_520nm():
+    """With Fluorescein selected the drawn 'Target Center' vertical line must
+    sit at 520 nm, so the recorded peak lands on the right position (the
+    sample in the field photo is fluorescein sodium, not EGFP)."""
+    gui = _make_gui()
+    gui.current_fluorophore = FLUORESCEIN
+    gui.blank_selector = types.SimpleNamespace(get_files=lambda: ["blank.dng"])
+    gui.sample_selector = types.SimpleNamespace(get_files=lambda: ["sample.dng"])
+
+    wls = np.linspace(400.0, 700.0, 256)
+    intensity = np.exp(-((wls - 521.0) ** 2) / (2 * 18.0 ** 2))
+    mask = np.zeros_like(wls, dtype=bool)
+    mask[::2] = True
+    gui.get_net_areas_batch = lambda *a, **k: (np.array([1.0, 1.5]), wls, intensity, mask)
+
+    mw.FSSA_GUI.step3_analyze(gui)
+
+    vline_xs = [line.get_xdata()[0] for line in gui.ax.get_lines()
+                if len(set(np.asarray(line.get_xdata()).tolist())) == 1]
+    assert 520.0 in vline_xs, f"target line not at 520 nm: {vline_xs}"
+
+
+# ---------------------------------------------------------------------------
+# 荧光素 canonical ID —— 跨端 preset 互通（Android MycoSpec enum name）
+# ---------------------------------------------------------------------------
+class _Combo:
+    """记录 set/get 的假下拉框（无头环境没有真 ttk.Combobox）。"""
+
+    def __init__(self, parent=None, values=None, **kwargs):
+        self.values = list(values or [])
+        self.current = None
+
+    def set(self, value):
+        self.current = value
+
+    def get(self):
+        return self.current
+
+    def pack(self, **kwargs):
+        return None
+
+    def bind(self, *args, **kwargs):
+        return None
+
+
+@pytest.mark.parametrize("raw,expected", [
+    # canonical 本身，大小写不敏感
+    ("YPET", "YPET"), ("ypet", "YPET"), ("Ypet", "YPET"),
+    ("EGFP", "EGFP"), ("egfp", "EGFP"),
+    ("MCHERRY", "MCHERRY"), ("mcherry", "MCHERRY"),
+    ("CFP", "CFP"), ("cfp", "CFP"),
+    ("MTURQUOISE2", "MTURQUOISE2"), ("mturquoise2", "MTURQUOISE2"),
+    ("FLUORESCEIN", "FLUORESCEIN"), ("fluorescein", "FLUORESCEIN"),
+    # Python 旧显示名：存量 preset 里写的就是这些
+    ("Ypet (Venus variant)", "YPET"),
+    ("mCherry", "MCHERRY"),
+    ("mTurquoise2", "MTURQUOISE2"),
+    ("Fluorescein (sodium salt)", "FLUORESCEIN"),
+    # 常见变体：多余空格 / 连字符
+    ("Fluorescein", "FLUORESCEIN"),
+    ("m-turquoise2", "MTURQUOISE2"),
+    ("mTurquoise 2", "MTURQUOISE2"),
+    ("  ypet  ", "YPET"),
+])
+def test_canonical_fluorophore_resolves_every_known_spelling(raw, expected):
+    assert canonical_fluorophore(raw) == expected
+
+
+@pytest.mark.parametrize("raw", [None, "", "   ", "DsRed", "mCherry2", "not a dye"])
+def test_canonical_fluorophore_returns_none_for_unknown(raw):
+    assert canonical_fluorophore(raw) is None
+
+
+@pytest.mark.parametrize("android_id", ["MCHERRY", "mcherry", "MCherry"])
+def test_curve_preset_written_by_android_loads(gui, monkeypatch, tmp_path, android_id):
+    """Android 导出的 preset 写 canonical ID（enum name），Python 必须能加载。
+
+    前两个 case 是 enum name 本身；第三个是大小写/分隔符被改过的写法，
+    用来保证解析不是"只有完全等于 key 才认"。
+    """
+    path = _write_curve_preset(tmp_path, fluorophore=android_id)
+    monkeypatch.setattr(mw.filedialog, "askopenfilename", lambda **kw: str(path))
+    gui.fluor_combo = _Combo()
+
+    gui.load_curve_preset()
+
+    assert gui.messages.errors == []
+    assert gui.current_fluorophore == "MCHERRY"
+    assert gui.fluor_combo.get() == "mCherry"      # 下拉框显示 display_name
+
+
+def test_curve_preset_written_by_older_python_still_loads(gui, monkeypatch, tmp_path):
+    """存量 Python preset 写的是旧显示名 mCherry；改 key 不能让它加载失败。"""
+    path = _write_curve_preset(tmp_path, fluorophore="mCherry")
+    monkeypatch.setattr(mw.filedialog, "askopenfilename", lambda **kw: str(path))
+    gui.fluor_combo = _Combo()
+
+    gui.load_curve_preset()
+
+    assert gui.messages.errors == []
+    assert gui.current_fluorophore == "MCHERRY"
+    assert gui.fluor_combo.get() == "mCherry"      # 用户看到的文字没变
+
+
+def test_fluorophore_dropdown_lists_display_names(gui, monkeypatch):
+    """下拉框 values 必须是 display_name，不能把 'YPET' 这种大写串显示给用户。"""
+    built = []
+
+    class _SpyCombo(_Combo):
+        def __init__(self, parent=None, values=None, **kwargs):
+            built.append(list(values or []))
+            super().__init__(parent, values, **kwargs)
+
+    monkeypatch.setattr(mw.ttk, "Combobox", _SpyCombo)
+    gui.page3 = Stub()
+
+    mw.FSSA_GUI._setup_page3(gui)
+
+    assert built, "Step 3 did not build the fluorophore dropdown"
+    assert built[0] == [cfg["display_name"] for cfg in FLUOROPHORES.values()]
+    assert "Ypet (Venus variant)" in built[0] and "mCherry" in built[0]
+    assert "YPET" not in built[0] and "MCHERRY" not in built[0]
+
+
+def test_exported_curve_preset_carries_the_canonical_id(gui, monkeypatch, tmp_path):
+    """导出的 preset 必须写 canonical ID，否则 Android 端对不上。"""
+    from core.curve_preset import load_curve_preset
+    gui.cache_step4 = {
+        "concentrations": [0.0, 1.0, 2.0], "means": [1.0, 3.0, 5.0], "stds": [0.1, 0.2, 0.3],
+        "slope": 2.0, "intercept": 1.0, "r_value": 0.99, "r_squared": 0.98,
+        "metric_mode": "legacy", "regression_method": "ols",
+        "fluorophore": "mCherry",          # 存量写法，导出时要规范化
+    }
+    out = tmp_path / "exported.json"
+    monkeypatch.setattr(mw.filedialog, "asksaveasfilename", lambda **kw: str(out))
+
+    gui.export_curve_preset()
+
+    assert gui.messages.errors == []
+    assert load_curve_preset(str(out), "legacy")["fluorophore"] == "MCHERRY"

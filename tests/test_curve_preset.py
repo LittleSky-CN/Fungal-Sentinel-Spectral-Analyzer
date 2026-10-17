@@ -3,8 +3,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from config import canonical_fluorophore
 from core.curve_preset import load_curve_preset, save_curve_preset, validate_curve_preset
 from core.quantification import calculate_concentration
+
+# canonical ID（= Android enum name），从表解析而来而不是写死，改 key 不会破测试
+FLUOROPHORE = canonical_fluorophore("Ypet (Venus variant)")
 
 
 class CurvePresetTests(unittest.TestCase):
@@ -32,7 +36,7 @@ class CurvePresetTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             preset_path = Path(temp_dir) / "curve.json"
             save_curve_preset(
-                preset_path, self._cache(), "legacy", "Ypet (Venus variant)")
+                preset_path, self._cache(), "legacy", FLUOROPHORE)
             preset = load_curve_preset(preset_path, "legacy")
 
         self.assertEqual(preset["concentrations"], [0.0, 1.0, 2.0])
@@ -45,7 +49,7 @@ class CurvePresetTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             preset_path = Path(temp_dir) / "curve.json"
             save_curve_preset(
-                preset_path, self._cache(), "legacy", "Ypet (Venus variant)")
+                preset_path, self._cache(), "legacy", FLUOROPHORE)
             with self.assertRaisesRegex(ValueError, "different analysis mode"):
                 load_curve_preset(preset_path, "lod_iupac")
 
@@ -54,7 +58,7 @@ class CurvePresetTests(unittest.TestCase):
         save_data = {
             "schema_version": 1,
             "analysis_mode": "legacy",
-            "fluorophore": "Ypet (Venus variant)",
+            "fluorophore": FLUOROPHORE,
             "metric_mode": "unmixing",
             "regression_method": "ols",
             "concentrations": cache["concentrations"],

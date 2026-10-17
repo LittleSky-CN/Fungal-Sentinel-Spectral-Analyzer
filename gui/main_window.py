@@ -1,5 +1,9 @@
 # gui/main_window.py
-"""Main GUI Window for FSSA v1.4.8 (Spectral Unmixing LoD + Weighted Fusion + Turbidity).
+"""Main GUI Window for FSSA v1.5.0 (Spectral Unmixing LoD + Weighted Fusion + Turbidity).
+
+【v1.5.0】新增 Fluorescein (sodium salt) 荧光素选项（发射 520 nm / 激发 494 nm / green
+通道 / FWHM 25）；荧光素标识统一为 canonical ID（新增 canonical_fluorophore() 归一化解
+析），以便与 Android 端曲线预设互通。
 Theme-aware (gui/theme.py optional): neon-pop look when enabled, classic look otherwise.
 """
 import re
@@ -15,7 +19,7 @@ from matplotlib.figure import Figure
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from scipy.stats import linregress
 
-from config import FLUOROPHORES
+from config import FLUOROPHORES, canonical_fluorophore, fluorophore_display_name
 from core.image_processing import (
     get_exposure_time, read_dng_linear_rgb, read_dng_frame, auto_detect_x_roi,
     get_average_profiles, calibrate_wavelength, apply_rb_swap,
@@ -61,7 +65,7 @@ class FSSA_GUI:
         self.is_turbidity_mode = (analysis_mode == "turbidity")
 
         title_suffix = "TURBIDITY" if self.is_turbidity_mode else analysis_mode.upper()
-        self.root.title(f"Fungal Sentinel Spectral Analyzer (FSSA) v1.4.8 [{title_suffix}] - iGEM 2026")
+        self.root.title(f"Fungal Sentinel Spectral Analyzer (FSSA) v1.5.0 [{title_suffix}] - iGEM 2026")
         self.root.geometry("1600x950")
         self.root.minsize(1400, 900)
 
@@ -72,7 +76,8 @@ class FSSA_GUI:
         self.calibrator = None
         self.spd_params_path = None      # 最近一次导入/导出的 SPD preset 路径（供 Mode B 重算）
         self.rb_swapped = False           # 【v1.4.6】Step 1 反序自检结论，驱动后续帧的 R/B 重标注
-        self.current_fluorophore = "Ypet (Venus variant)"
+        # canonical ID（= Android enum name），显示时再转 display_name
+        self.current_fluorophore = "YPET"
         self.current_page = 1
         self.current_chart_filename = "FSSA_Chart"
 
@@ -176,10 +181,10 @@ class FSSA_GUI:
         if _THEME_ON:
             self.banner = _theme.StepBanner(left_frame)
             self.banner.pack(fill=tk.X, pady=(10, 0))
-            ttk.Label(left_frame, text=f"FSSA v1.4.8  [{self.analysis_mode.upper()}]",
+            ttk.Label(left_frame, text=f"FSSA v1.5.0  [{self.analysis_mode.upper()}]",
                       style="Title.TLabel").pack(pady=(6, 0))
         else:
-            ttk.Label(left_frame, text=f"FSSA v1.4.8\n({self.analysis_mode.upper()})",
+            ttk.Label(left_frame, text=f"FSSA v1.5.0\n({self.analysis_mode.upper()})",
                       font=("Arial", 14, "bold")).pack(pady=15)
 
         self.content_frame = ttk.Frame(left_frame)
@@ -248,7 +253,7 @@ class FSSA_GUI:
 
         self.fig = Figure(figsize=(8, 5), dpi=100)
         self.ax = self.fig.add_subplot(111)
-        self.ax.set_title("Welcome to FSSA v1.4.8\nPlease proceed with Step 1: Positioning.")
+        self.ax.set_title("Welcome to FSSA v1.5.0\nPlease proceed with Step 1: Positioning.")
         self.ax.axis('off')
         self._style_fig(self.fig)
         self.canvas_plot = FigureCanvasTkAgg(self.fig, master=right_frame)
@@ -341,8 +346,12 @@ class FSSA_GUI:
         else:
             self._head_label(f, "Step 3: Sample Analysis", "purple").pack(anchor=tk.W, pady=(0, 10))
             self._sub_label(f, "Select Fluorophore:").pack(anchor=tk.W)
-            self.fluor_combo = ttk.Combobox(f, values=list(FLUOROPHORES.keys()), state="readonly", width=25)
-            self.fluor_combo.set(self.current_fluorophore); self.fluor_combo.pack(pady=2, anchor=tk.W)
+            # 下拉框显示 display_name（用户可见文字不变），内部一律存 canonical ID
+            self.fluor_combo = ttk.Combobox(
+                f, values=[cfg["display_name"] for cfg in FLUOROPHORES.values()],
+                state="readonly", width=25)
+            self.fluor_combo.set(fluorophore_display_name(self.current_fluorophore))
+            self.fluor_combo.pack(pady=2, anchor=tk.W)
             self.fluor_combo.bind("<<ComboboxSelected>>", self.on_fluorophore_change)
             self.lbl_fluor_channel = self._sub_label(f, "", wraplength=460)
             self.lbl_fluor_channel.pack(anchor=tk.W, pady=(2, 0))
@@ -488,7 +497,9 @@ class FSSA_GUI:
             self.lbl_csv.config(text=Path(path).name, foreground=self._dyn_fg("black"))
 
     def on_fluorophore_change(self, event):
-        self.current_fluorophore = self.fluor_combo.get()
+        # 下拉框里是 display_name，反查回 canonical；解析不出来就保留原值
+        self.current_fluorophore = (canonical_fluorophore(self.fluor_combo.get())
+                                    or self.current_fluorophore)
         self._update_fluor_channel_label()
 
     def _update_fluor_channel_label(self):
@@ -780,9 +791,11 @@ class FSSA_GUI:
         if not file_path:
             return
         try:
+            # 导出一律写 canonical ID，Android 端才能对上
+            export_fluor = (canonical_fluorophore(self.cache_step4.get("fluorophore"))
+                            or self.current_fluorophore)
             save_curve_preset(
-                file_path, self.cache_step4, self.analysis_mode,
-                self.cache_step4.get("fluorophore", self.current_fluorophore))
+                file_path, self.cache_step4, self.analysis_mode, export_fluor)
             messagebox.showinfo("Success", f"Curve preset saved to:\n{file_path}")
         except (OSError, TypeError, ValueError, KeyError) as e:
             messagebox.showerror("Error", f"Could not save curve preset:\n{e}")
@@ -798,17 +811,20 @@ class FSSA_GUI:
             return
         try:
             preset = read_curve_preset(file_path, self.analysis_mode)
-            if preset["fluorophore"] not in FLUOROPHORES:
+            # Android 写 canonical ID，Python 存量 preset 写旧显示名，两种都能解析
+            fluor_id = canonical_fluorophore(preset.get("fluorophore"))
+            if fluor_id is None:
                 raise ValueError("The preset fluorophore is not available in this version.")
+            preset["fluorophore"] = fluor_id      # 下游一律用 canonical
             self.curve_preset = preset
-            self.current_fluorophore = preset["fluorophore"]
+            self.current_fluorophore = fluor_id
             if not self.is_turbidity_mode:
                 # 预设加载时把下拉框同步到曲线自带的荧光素，但**不要锁死**：
                 # calculate_with_curve_preset 用的是 preset["fluorophore"]，
                 # 与 Step 3 当前选什么完全无关（日志也会报 Preset fluorophore），
                 # 锁死只会让用户在 Step 3 无法分析别的染料（下拉能展开、选择却
                 # 不生效，看起来就像"填了数据没改 UI"）。
-                self.fluor_combo.set(self.current_fluorophore)
+                self.fluor_combo.set(fluorophore_display_name(fluor_id))
             self.btn_calc_conc.config(text="Calculate with Curve Preset")
             self.btn_clear_curve_preset.config(state="normal")
             self.lbl_curve_preset.config(
@@ -821,7 +837,8 @@ class FSSA_GUI:
                     "intercept": preset["fit"].get("intercept"),
                     "r2": preset["fit"].get("r_squared"),
                     "metric_mode": preset["metric_mode"],
-                    "fluorophore": preset["fluorophore"],
+                    # 报告/溯源给人看，显示 display_name 而不是大写 canonical
+                    "fluorophore": fluorophore_display_name(fluor_id),
                     "n_standards": len(preset["concentrations"]),
                     "regression_method": preset["regression_method"],
                 })
@@ -1157,7 +1174,7 @@ class FSSA_GUI:
                          "Spike rejection: isolated outliers only (5-point neighborhood, 4.5 MAD)\n")
             # 【v1.4.8】通道与报告 Tab 3 的 "Channel" 行同源，避免主界面与报告口径不一致
             fluor_label = ("Turbidity (Green channel)" if self.is_turbidity_mode
-                           else self.current_fluorophore)
+                           else fluorophore_display_name(self.current_fluorophore))
             log_text += f"Fluorophore: {fluor_label}\n"
             log_text += (f"Analysis channel: {str(fluor_config.get('channel', '?')).upper()}"
                          f"  |  Target peak: {fluor_config.get('peak_wl')} nm"
@@ -1187,7 +1204,8 @@ class FSSA_GUI:
             self.cache_step3 = {"wls": wls, "intensity": intensity, "mask": mask, "fluor": fluor_config,
                                 "mean_area": mean_area, "peak": peak, "features": features,
                                 "spd_applied": bool(self.calibrator),
-                                "fluor_name": None if self.is_turbidity_mode else self.current_fluorophore}
+                                "fluor_name": None if self.is_turbidity_mode
+                                else fluorophore_display_name(self.current_fluorophore)}
 
             self.ax.clear()
             self.ax.plot(wls, intensity, color=self._spec_line_color(), label='Net Spectrum')
@@ -1204,7 +1222,8 @@ class FSSA_GUI:
                     "sample_files": ", ".join(Path(p).name for p in sample_files),
                     "n_blank": len(blank_files),
                     "n_sample": len(sample_files),
-                    "fluorophore": None if self.is_turbidity_mode else self.current_fluorophore,
+                    "fluorophore": None if self.is_turbidity_mode
+                    else fluorophore_display_name(self.current_fluorophore),
                     "spd_status": spd_status,
                     "mean_area": float(mean_area),
                     "peak": float(peak),
@@ -1260,7 +1279,10 @@ class FSSA_GUI:
 
         self.log_status(4, "Calculating with curve preset...", "orange")
         try:
-            fluor = FLUOROPHORES[preset["fluorophore"]]
+            fluor_id = canonical_fluorophore(preset.get("fluorophore"))
+            if fluor_id is None:
+                raise ValueError("The preset fluorophore is not available in this version.")
+            fluor = FLUOROPHORES[fluor_id]
             concentrations = preset["concentrations"]
             means = preset["means"]
             stds = preset["stds"]
@@ -1317,7 +1339,7 @@ class FSSA_GUI:
                 "means": means,
                 "stds": stds,
                 "metric_mode": metric_mode,
-                "fluorophore": preset["fluorophore"],
+                "fluorophore": fluor_id,
                 "t_stat": t_stat,
                 "unmix": unmix_info,
                 "blocks": [],
@@ -1327,7 +1349,7 @@ class FSSA_GUI:
             self.txt_result.insert(
                 tk.END,
                 f"\n=== Step 4: Curve Preset ===\n"
-                f"Preset fluorophore: {preset['fluorophore']}\n"
+                f"Preset fluorophore: {fluorophore_display_name(fluor_id)}\n"
                 f"Quantification metric: {metric_mode.upper()}\n"
                 f"Regression method: {preset['regression_method'].upper()}\n"
                 f"Curve: I = {calc_result['slope']:.6g}*C + {calc_result['intercept']:.6g} "
@@ -1630,7 +1652,7 @@ class FSSA_GUI:
                     "regression_method": reg_method,
                     "n_standards": len(concentrations),
                     "metric_mode": metric_mode,
-                    "fluorophore": self.current_fluorophore,
+                    "fluorophore": fluorophore_display_name(self.current_fluorophore),
                     "predicted_conc": calc_result.get("sample_conc"),
                 })
             self.root.after(200, self._auto_show_report)

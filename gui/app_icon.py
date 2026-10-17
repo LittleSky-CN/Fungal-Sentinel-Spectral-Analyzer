@@ -16,7 +16,7 @@ def apply_app_icon(root: tk.Tk | tk.Toplevel) -> bool:
     try:
         import ctypes
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
-            "iGEM.CAU-China.FungalSentinel.1.4.8")
+            "iGEM.CAU-China.FungalSentinel.1.5.0")
     except Exception:
         pass
 

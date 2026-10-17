@@ -30,8 +30,10 @@ from core.curve_preset import (
 )
 from core.quantification import calculate_concentration
 from core.unmixing import unmix_spectrum
+from config import canonical_fluorophore
 
-FLUOROPHORE = "Ypet (Venus variant)"
+# canonical ID（= Android enum name），从表解析而来而不是写死，改 key 不会破测试
+FLUOROPHORE = canonical_fluorophore("Ypet (Venus variant)")
 REGRESSION_METHODS = ("ols", "weighted_1y", "weighted_1y2")
 METRIC_MODES = ("unmixing", "legacy")
 

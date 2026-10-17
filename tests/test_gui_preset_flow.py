@@ -18,7 +18,11 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from config import canonical_fluorophore
 from core.calibration import LinearMapping, SpectralResponseCalibrator
+
+# canonical ID（= Android enum name），从表解析而来而不是写死，改 key 不会破测试
+FLUOROPHORE = canonical_fluorophore("Ypet (Venus variant)")
 
 DATA_DIR = Path("D:/Documents/iGem/Python/FSSA_Documents/10.15")
 POSITIONING = DATA_DIR / "positioning.dng"
@@ -148,7 +152,7 @@ def _make_gui():
     gui.spd_params_path = None
     gui.txt_file = None
     gui.csv_file = None
-    gui.current_fluorophore = "Ypet (Venus variant)"
+    gui.current_fluorophore = FLUOROPHORE
     gui.cache_step1 = {}
     gui.cache_step2 = {}
     gui.cache_step3 = {}

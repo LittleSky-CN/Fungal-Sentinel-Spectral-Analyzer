@@ -1,5 +1,9 @@
 # main.py
-"""FSSA v1.4.8 Main Entry Point.
+"""FSSA v1.5.0 Main Entry Point.
+
+【v1.5.0】新增 Fluorescein (sodium salt) 荧光素选项（发射 520 nm / 激发 494 nm / green
+通道 / FWHM 25）；荧光素标识统一为 canonical ID（新增 canonical_fluorophore() 归一化解
+析），以便与 Android 端曲线预设互通。
 - 分析模式选择 (LoD/IUPAC、Legacy、Turbidity)
 - 可选霓虹主题 (gui/theme.py + config.py, 缺失时自动回退经典外观)
 - 统一团队图标 (gui/app_icon.py: 多尺寸透明底 .ico; Toplevel 自动继承)
@@ -65,7 +69,7 @@ class ModeSelector:
         apply_app_icon(root)            # 团队图标：初始选择窗口
         _apply_theme_if_enabled(root)
 
-        self.root.title("FSSA v1.4.8 - Analysis Mode Selection")
+        self.root.title("FSSA v1.5.0 - Analysis Mode Selection")
         self.root.geometry("600x650")
         self.root.resizable(True, True)
         self.root.eval('tk::PlaceWindow . center')

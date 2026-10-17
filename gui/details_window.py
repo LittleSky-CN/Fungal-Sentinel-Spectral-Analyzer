@@ -1,5 +1,9 @@
 # gui/details_window.py
-"""FSSA v1.4.8 Detailed Analysis Report.
+"""FSSA v1.5.0 Detailed Analysis Report.
+
+【v1.5.0】新增 Fluorescein (sodium salt) 荧光素选项（发射 520 nm / 激发 494 nm / green
+通道 / FWHM 25）；荧光素标识统一为 canonical ID（新增 canonical_fluorophore() 归一化解
+析），以便与 Android 端曲线预设互通。
 Tab 2 fixed: Figure 4a-4d with ONE continuous pointwise-fused curve
 (weights response-proportional, sum = 1, no cross-wavelength smoothing).
 """
@@ -63,7 +67,7 @@ def _safe_div(a, b):
 class DetailsWindow:
     def __init__(self, parent, cache1, cache2, cache3, cache4, mapping, preset_provenance=None):
         self.win = tk.Toplevel(parent)
-        self.win.title("FSSA v1.4.8 — Detailed Analysis Report & Parameters")
+        self.win.title("FSSA v1.5.0 — Detailed Analysis Report & Parameters")
         self.win.geometry("2000x2000")
         if _THEME_ON:
             _theme.tint(self.win)
