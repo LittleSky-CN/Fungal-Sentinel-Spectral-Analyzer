@@ -18,7 +18,7 @@ from config import DEFAULT_PARAMS
 # L3 thresholds are duplicated on the Android side (MycoSpec
 # analysis/SpectralResponseCalibrator.kt); keep both in sync.
 # ---------------------------------------------------------------------------
-APP_VERSION = "1.4.7"
+APP_VERSION = "1.4.8"
 SPD_SCHEMA_VERSION = 2
 DRIFT_WARN_NM = 2.0          # below this: silent.  Real Step 1 G-residual is ~5.5 nm.
 DRIFT_SEVERE_NM = 10.0       # above this: orange warning + confirm.  Never a rejection.

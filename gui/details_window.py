@@ -1,5 +1,5 @@
 # gui/details_window.py
-"""FSSA v1.4.7 Detailed Analysis Report.
+"""FSSA v1.4.8 Detailed Analysis Report.
 Tab 2 fixed: Figure 4a-4d with ONE continuous pointwise-fused curve
 (weights response-proportional, sum = 1, no cross-wavelength smoothing).
 """
@@ -63,7 +63,7 @@ def _safe_div(a, b):
 class DetailsWindow:
     def __init__(self, parent, cache1, cache2, cache3, cache4, mapping, preset_provenance=None):
         self.win = tk.Toplevel(parent)
-        self.win.title("FSSA v1.4.7 — Detailed Analysis Report & Parameters")
+        self.win.title("FSSA v1.4.8 — Detailed Analysis Report & Parameters")
         self.win.geometry("2000x2000")
         if _THEME_ON:
             _theme.tint(self.win)
@@ -89,18 +89,18 @@ class DetailsWindow:
 
         btn_frame = ttk.Frame(self.win)
         btn_frame.pack(fill=tk.X, padx=10, pady=10)
-        figs_to_export = [f for f in (
+        self.figs_to_export = [f for f in (
             self.fig1, self.fig1_params, self.fig2, self.fig2_params,
             self.fig3, self.fig3_params, self.fig4, self.fig4_params,
             self.fig5) if f is not None]
         if _THEME_ON:
             ttk.Button(btn_frame, text="📥 Export Full Report (PDF)", style="Magenta.TButton",
-                       command=lambda: self.export_pdf_report(figs_to_export)).pack(side=tk.LEFT)
+                       command=lambda: self.export_pdf_report(self.figs_to_export)).pack(side=tk.LEFT)
             ttk.Button(btn_frame, text="Close", style="Pale.TButton",
                        command=self.win.destroy).pack(side=tk.RIGHT)
         else:
             ttk.Button(btn_frame, text=" Export Full Report (PDF)",
-                       command=lambda: self.export_pdf_report(figs_to_export)).pack(side=tk.LEFT)
+                       command=lambda: self.export_pdf_report(self.figs_to_export)).pack(side=tk.LEFT)
             ttk.Button(btn_frame, text="Close", command=self.win.destroy).pack(side=tk.RIGHT)
 
         self.win.bind("<MouseWheel>", self._on_mousewheel)
@@ -187,24 +187,45 @@ class DetailsWindow:
         txt.config(state=tk.DISABLED)
         return txt
 
-    def _create_params_figure(self, title, params_text):
-        fig = Figure(figsize=(15, 6), dpi=100)
-        tcol = "black"
-        if _THEME_ON:
-            fig.patch.set_facecolor(_theme.CREAM); tcol = _theme.INK
-        else:
-            fig.patch.set_facecolor("white")
-        ax = fig.add_subplot(111); ax.axis("off")
-        ax.set_title(title, fontsize=16, fontweight="bold", pad=20, color=tcol)
-        fig.text(0.05, 0.85, params_text, fontsize=11, family="monospace",
-                 verticalalignment="top", color=tcol)
-        return fig
+    # 等宽字体字符步进（em，DejaVu Sans Mono 实测 ~0.59），取 0.62 留余量
+    _MONO_CHAR_EM = 0.62
+    # 全角字符（CJK 等）在等宽字体里占两格
+    _WIDE_CHAR_CP = 0x2E80
 
-    def _create_provenance_figure(self, title, params_text):
-        """Same look as :meth:`_create_params_figure`, but the canvas grows with
-        the number of lines so the provenance page is never clipped in the PDF."""
-        n_lines = params_text.count("\n") + 1
-        height = max(6.0, min(40.0, 1.6 + 0.22 * n_lines))
+    def _wrap_monospace(self, text, fontsize, x):
+        """按估算的列宽手工折行。
+
+        ``fig.text`` 画等宽文本时不会自动折行，超宽的行会画到画布外、在 PDF 里
+        被裁掉右半截（窗口里的 ``tk.Text`` 是 ``wrap=tk.WORD``，不会）。
+        """
+        usable_in = 15.0 * (1.0 - x - 0.03)
+        width = max(24, int(usable_in * 72.0 / (fontsize * self._MONO_CHAR_EM)))
+        out = []
+        for line in text.split("\n"):
+            if sum(2 if ord(c) >= self._WIDE_CHAR_CP else 1 for c in line) <= width:
+                out.append(line)
+                continue
+            chunks, cur, cur_w = [], [], 0
+            for ch in line:
+                w = 2 if ord(ch) >= self._WIDE_CHAR_CP else 1
+                if cur_w + w > width:
+                    chunks.append("".join(cur))
+                    cur, cur_w = [], 0
+                cur.append(ch)
+                cur_w += w
+            chunks.append("".join(cur))
+            out.extend(chunks)
+        return "\n".join(out)
+
+    def _create_text_figure(self, title, params_text, fontsize=10, x=0.03):
+        """一整页纯文本（参数面板 / 预设溯源）的 figure。
+
+        画布高度随行数增长（原先只有溯源页这么做），否则行数一多就会画到画布
+        外面、PDF 里被裁掉底部。
+        """
+        wrapped = self._wrap_monospace(params_text, fontsize, x)
+        n_lines = wrapped.count("\n") + 1
+        height = max(6.0, min(60.0, 1.6 + 0.22 * n_lines))
         fig = Figure(figsize=(15, height), dpi=100)
         tcol = "black"
         if _THEME_ON:
@@ -213,9 +234,15 @@ class DetailsWindow:
             fig.patch.set_facecolor("white")
         ax = fig.add_subplot(111); ax.axis("off")
         ax.set_title(title, fontsize=16, fontweight="bold", pad=20, color=tcol)
-        fig.text(0.03, 0.94, params_text, fontsize=10, family="monospace",
+        fig.text(x, 0.94, wrapped, fontsize=fontsize, family="monospace",
                  verticalalignment="top", color=tcol)
         return fig
+
+    def _create_params_figure(self, title, params_text):
+        return self._create_text_figure(title, params_text, fontsize=11, x=0.05)
+
+    def _create_provenance_figure(self, title, params_text):
+        return self._create_text_figure(title, params_text)
 
     # ---------------- Tab 1 ----------------
     def _build_tab1(self):
@@ -614,6 +641,7 @@ class DetailsWindow:
 
     # ---------------- PDF ----------------
     def export_pdf_report(self, figures):
+        figures = [f for f in (figures or []) if f is not None]
         if not figures:
             return
         file_path = filedialog.asksaveasfilename(title="Export PDF Report", defaultextension=".pdf",

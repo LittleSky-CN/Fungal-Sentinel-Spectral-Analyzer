@@ -19,6 +19,8 @@ reference-SPD grid, so a preset loaded under a drifted mapping is *recomputed*
 import json
 import math
 
+from core.calibration import APP_VERSION
+
 import numpy as np
 import pytest
 
@@ -172,7 +174,8 @@ def test_spd_params_json_stores_the_wavelength_mapping_and_raw_lamp(tmp_path):
     cal.save_params(str(path))
     payload = json.loads(path.read_text(encoding="utf-8"))
 
-    assert payload["version"] == "1.4.7"
+    # 跟着 APP_VERSION 走，别硬编码：否则每次升版这条都会假失败
+    assert payload["version"] == APP_VERSION
     assert payload["schema_version"] == 2
     for legacy_key in ("valid_range", "smooth_window", "spd_threshold_ratio",
                        "wavelengths", "response_R", "response_G", "response_B"):

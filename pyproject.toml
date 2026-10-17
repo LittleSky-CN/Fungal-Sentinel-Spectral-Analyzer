@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fssa"
-version = "1.4.7"
+version = "1.4.8"
 description = "FSSA (Fungal Sentinel Spectral Analyzer) - offline-first desktop pipeline for smartphone-DNG grating fluorescence spectroscopy"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -32,7 +32,7 @@ dependencies = [
 [project.optional-dependencies]
 # opencv-python (GUI build) instead of the headless wheel
 gui = ["opencv-python>=4.8"]
-test = ["pytest>=7.4"]
+test = ["pytest>=7.4", "pypdf>=3.0"]
 
 [project.urls]
 Homepage = "https://github.com/LittleSky-CN/Fungal-Sentinel-Spectral-Analyzer"

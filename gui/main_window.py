@@ -1,5 +1,5 @@
 # gui/main_window.py
-"""Main GUI Window for FSSA v1.4.7 (Spectral Unmixing LoD + Weighted Fusion + Turbidity).
+"""Main GUI Window for FSSA v1.4.8 (Spectral Unmixing LoD + Weighted Fusion + Turbidity).
 Theme-aware (gui/theme.py optional): neon-pop look when enabled, classic look otherwise.
 """
 import re
@@ -61,7 +61,7 @@ class FSSA_GUI:
         self.is_turbidity_mode = (analysis_mode == "turbidity")
 
         title_suffix = "TURBIDITY" if self.is_turbidity_mode else analysis_mode.upper()
-        self.root.title(f"Fungal Sentinel Spectral Analyzer (FSSA) v1.4.7 [{title_suffix}] - iGEM 2026")
+        self.root.title(f"Fungal Sentinel Spectral Analyzer (FSSA) v1.4.8 [{title_suffix}] - iGEM 2026")
         self.root.geometry("1600x950")
         self.root.minsize(1400, 900)
 
@@ -86,6 +86,8 @@ class FSSA_GUI:
         self.curve_preset_frame = None
         self.btn_clear_curve_preset = None
         self.lbl_curve_preset = None
+        # turbidity 模式没有荧光素下拉框，此句柄保持 None
+        self.lbl_fluor_channel = None
         # 【溯源】记录每一步参数来自导入的 preset 还是本次现场标定
         self.preset_provenance = {"step1": None, "step2": None, "step3": None, "step4": None}
 
@@ -174,10 +176,10 @@ class FSSA_GUI:
         if _THEME_ON:
             self.banner = _theme.StepBanner(left_frame)
             self.banner.pack(fill=tk.X, pady=(10, 0))
-            ttk.Label(left_frame, text=f"FSSA v1.4.7  [{self.analysis_mode.upper()}]",
+            ttk.Label(left_frame, text=f"FSSA v1.4.8  [{self.analysis_mode.upper()}]",
                       style="Title.TLabel").pack(pady=(6, 0))
         else:
-            ttk.Label(left_frame, text=f"FSSA v1.4.7\n({self.analysis_mode.upper()})",
+            ttk.Label(left_frame, text=f"FSSA v1.4.8\n({self.analysis_mode.upper()})",
                       font=("Arial", 14, "bold")).pack(pady=15)
 
         self.content_frame = ttk.Frame(left_frame)
@@ -246,7 +248,7 @@ class FSSA_GUI:
 
         self.fig = Figure(figsize=(8, 5), dpi=100)
         self.ax = self.fig.add_subplot(111)
-        self.ax.set_title("Welcome to FSSA v1.4.7\nPlease proceed with Step 1: Positioning.")
+        self.ax.set_title("Welcome to FSSA v1.4.8\nPlease proceed with Step 1: Positioning.")
         self.ax.axis('off')
         self._style_fig(self.fig)
         self.canvas_plot = FigureCanvasTkAgg(self.fig, master=right_frame)
@@ -342,6 +344,9 @@ class FSSA_GUI:
             self.fluor_combo = ttk.Combobox(f, values=list(FLUOROPHORES.keys()), state="readonly", width=25)
             self.fluor_combo.set(self.current_fluorophore); self.fluor_combo.pack(pady=2, anchor=tk.W)
             self.fluor_combo.bind("<<ComboboxSelected>>", self.on_fluorophore_change)
+            self.lbl_fluor_channel = self._sub_label(f, "", wraplength=460)
+            self.lbl_fluor_channel.pack(anchor=tk.W, pady=(2, 0))
+            self._update_fluor_channel_label()
             ttk.Separator(f, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=10)
 
         self.blank_selector = MultiFileSelector(f, "Blank / Background (1-5 images)", max_files=5)
@@ -467,7 +472,26 @@ class FSSA_GUI:
             self.csv_file = path
             self.lbl_csv.config(text=Path(path).name, foreground=self._dyn_fg("black"))
 
-    def on_fluorophore_change(self, event): self.current_fluorophore = self.fluor_combo.get()
+    def on_fluorophore_change(self, event):
+        self.current_fluorophore = self.fluor_combo.get()
+        self._update_fluor_channel_label()
+
+    def _update_fluor_channel_label(self):
+        """把当前荧光素的通道/峰位/FWHM 显示在 Step 3 下拉框下方。
+
+        报告 Tab 3 早就带 Channel 一行，但 Step 3 主界面与日志里只有荧光素名，
+        用户选完不知道这次会走 R/G/B 哪条通道。这里与报告口径保持一致。
+        """
+        if self.lbl_fluor_channel is None:
+            return
+        cfg = FLUOROPHORES.get(self.current_fluorophore)
+        if not cfg:
+            self.lbl_fluor_channel.config(text="")
+            return
+        channel = str(cfg.get("channel", "?")).upper()
+        self.lbl_fluor_channel.config(
+            text=f"Analysis channel: {channel}  |  Peak: {cfg.get('peak_wl')} nm"
+                 f"  |  FWHM: {cfg.get('fwhm')} nm")
 
     def log_status(self, step, msg, color="black"):
         if _THEME_ON:
@@ -1112,7 +1136,13 @@ class FSSA_GUI:
             log_text += f"SPD Correction Status: {spd_status}\n"
             log_text += ("SPD reliability: channels below 20% of peak response excluded\n"
                          "Spike rejection: isolated outliers only (5-point neighborhood, 4.5 MAD)\n")
-            if not self.is_turbidity_mode: log_text += f"Fluorophore: {self.current_fluorophore}\n"
+            # 【v1.4.8】通道与报告 Tab 3 的 "Channel" 行同源，避免主界面与报告口径不一致
+            fluor_label = ("Turbidity (Green channel)" if self.is_turbidity_mode
+                           else self.current_fluorophore)
+            log_text += f"Fluorophore: {fluor_label}\n"
+            log_text += (f"Analysis channel: {str(fluor_config.get('channel', '?')).upper()}"
+                         f"  |  Target peak: {fluor_config.get('peak_wl')} nm"
+                         f"  |  FWHM: {fluor_config.get('fwhm')} nm\n")
             log_text += f"Net Area (Mean): {mean_area:.2f} | Peak: {peak:.2f}\n"
             log_text += f"--- Microplate Reader Style Parameters ---\n"
             log_text += f"Peak Wavelength: {features['peak_wl']:.1f} nm\n"

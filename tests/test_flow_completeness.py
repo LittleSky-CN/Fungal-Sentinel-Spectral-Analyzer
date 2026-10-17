@@ -205,6 +205,8 @@ def _make_gui(analysis_mode="legacy"):
     gui.blank_selector = types.SimpleNamespace(get_files=lambda: [])
     gui.fluor_combo = Stub()
     gui.btn_calc_conc = Stub()
+    # 【v1.4.8】turbidity 模式为 None；非 turbidity 由 _setup_page3 建立
+    gui.lbl_fluor_channel = None
     # 【v1.4.7】非 turbidity 模式下 Step 4 预设控件真实存在；turbidity 下这三个句柄为 None
     gui.curve_preset_frame = Stub()
     gui.btn_clear_curve_preset = Stub()
@@ -845,3 +847,85 @@ def test_turbidity_mode_show_page_does_not_touch_the_preset_frame():
 
     assert gui.pages_packed == [1, 2, 3]
     assert gui.btn_prev.config_calls and gui.btn_next.config_calls
+
+
+class _ResultText:
+    """Records what step3_analyze writes into the results pane."""
+
+    def __init__(self):
+        self.logged = ""
+
+    def insert(self, *args):
+        if args and isinstance(args[-1], str):
+            self.logged += args[-1]
+
+    def see(self, *args):
+        return None
+
+
+def test_fluor_channel_label_reports_the_configured_channel():
+    """Step 3 must show which R/G/B channel each fluorophore is read from.
+
+    The report's Tab 3 already carried a "Channel" line; the Step 3 pane and the
+    run log only ever showed the fluorophore name, so the user picked a dye
+    without being told which channel it would be measured on.
+    """
+    from config import FLUOROPHORES
+
+    for name, cfg in FLUOROPHORES.items():
+        gui = _make_gui()
+        gui.lbl_fluor_channel = ConfigProbe()
+        gui.current_fluorophore = name
+        mw.FSSA_GUI._update_fluor_channel_label(gui)
+        calls = gui.lbl_fluor_channel.config_calls
+        assert calls, f"no label update for {name}"
+        text = calls[-1][1].get("text", "")
+        assert cfg["channel"].upper() in text, f"{name}: {text!r} lacks channel"
+        assert str(cfg["peak_wl"]) in text, f"{name}: {text!r} lacks peak"
+        assert str(cfg["fwhm"]) in text, f"{name}: {text!r} lacks FWHM"
+
+
+def test_fluor_channel_label_is_inert_without_the_widget():
+    """Turbidity mode never builds the fluorophore combo, so the label is None."""
+    gui = _make_gui(analysis_mode="turbidity")
+    gui.lbl_fluor_channel = None
+    mw.FSSA_GUI._update_fluor_channel_label(gui)
+    mw.FSSA_GUI.on_fluorophore_change(gui, None)
+
+
+def test_fluor_channel_label_follows_the_combo_selection():
+    gui = _make_gui()
+    gui.lbl_fluor_channel = ConfigProbe()
+    gui.fluor_combo = types.SimpleNamespace(get=lambda: "mCherry")
+    mw.FSSA_GUI.on_fluorophore_change(gui, None)
+    assert gui.current_fluorophore == "mCherry"
+    text = gui.lbl_fluor_channel.config_calls[-1][1].get("text", "")
+    assert "RED" in text, text
+
+
+def test_step3_log_reports_the_analysis_channel():
+    """The run log must name the channel, matching what the report Tab 3 shows."""
+    gui = _make_gui()
+    gui.current_fluorophore = "mCherry"
+    gui.blank_selector = types.SimpleNamespace(get_files=lambda: ["blank.dng"])
+    gui.sample_selector = types.SimpleNamespace(get_files=lambda: ["sample.dng"])
+    gui.txt_result = _ResultText()
+
+    wls = np.linspace(400.0, 700.0, 256)
+    intensity = np.exp(-((wls - 610.0) ** 2) / (2 * 20.0 ** 2))
+    mask = np.zeros_like(wls, dtype=bool)
+    mask[::2] = True
+    gui.get_net_areas_batch = lambda *a, **k: (np.array([1.0, 1.5]), wls, intensity, mask)
+
+    mw.FSSA_GUI.step3_analyze(gui)
+
+    assert "Analysis channel: RED" in gui.txt_result.logged
+    assert "Fluorophore: mCherry" in gui.txt_result.logged
+    # turbidity 走固定的 green 通道，同样要在日志里报出来
+    turb = _make_gui(analysis_mode="turbidity")
+    turb.blank_selector = types.SimpleNamespace(get_files=lambda: ["blank.dng"])
+    turb.sample_selector = types.SimpleNamespace(get_files=lambda: ["sample.dng"])
+    turb.txt_result = _ResultText()
+    turb.get_net_areas_batch = lambda *a, **k: (np.array([1.0]), wls, intensity, mask)
+    mw.FSSA_GUI.step3_analyze(turb)
+    assert "Analysis channel: GREEN" in turb.txt_result.logged
