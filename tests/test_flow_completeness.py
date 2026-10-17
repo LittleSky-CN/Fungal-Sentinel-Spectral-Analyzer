@@ -929,3 +929,72 @@ def test_step3_log_reports_the_analysis_channel():
     turb.get_net_areas_batch = lambda *a, **k: (np.array([1.0]), wls, intensity, mask)
     mw.FSSA_GUI.step3_analyze(turb)
     assert "Analysis channel: GREEN" in turb.txt_result.logged
+
+
+class _ComboProbe:
+    """Records config() writes on the fluorophore dropdown."""
+
+    def __init__(self):
+        self.config_calls = []
+        self.value = None
+
+    def set(self, v):
+        self.value = v
+
+    def get(self):
+        return self.value
+
+    def config(self, *args, **kwargs):
+        self.config_calls.append((args, kwargs))
+
+    def bind(self, *args, **kwargs):
+        return None
+
+
+def test_curve_preset_does_not_lock_the_fluorophore_dropdown(
+        gui, monkeypatch, tmp_path):
+    """Loading a curve preset must not disable the Step 3 dye dropdown.
+
+    ``calculate_with_curve_preset`` recomputes the sample area with the
+    curve's own ``preset["fluorophore"]`` -- what Step 3 has selected is
+    irrelevant to it, and the log already reports ``Preset fluorophore``.
+    Locking the combobox only stopped users from analysing other dyes:
+    the popdown still opened but selections were ignored (disabled state),
+    which looked exactly like "the data was filled in but the UI didn't
+    change".
+    """
+    path = _write_curve_preset(tmp_path)
+    gui.calibrator = _make_calibrator()
+    gui.blank_selector = _ns(get_files=lambda: ["blank.dng"])
+    gui.sample_selector = _ns(get_files=lambda: ["sample.dng"])
+    probe = _ComboProbe()
+    gui.fluor_combo = probe
+    monkeypatch.setattr(mw.filedialog, "askopenfilename", lambda **kw: str(path))
+
+    gui.load_curve_preset()
+
+    assert probe.value == "Ypet (Venus variant)"
+    disabled = [k for _, k in probe.config_calls if k.get("state") == "disabled"]
+    assert not disabled, probe.config_calls
+
+
+def test_wheel_target_check_survives_combobox_popdown_paths():
+    """``bind_all`` also receives wheel events from Combobox popdowns, which
+    are standalone Tcl windows: there ``event.widget`` is a plain widget-path
+    string, and walking ``.master`` used to raise
+    ``AttributeError: 'str' object has no attribute 'master'`` on every wheel
+    tick over the dye dropdown."""
+    root_w, canvas = object(), object()
+    assert mw.FSSA_GUI._wheel_target_in_region(
+        ".!combopopdown.f.l", root_w, canvas) is False
+    assert mw.FSSA_GUI._wheel_target_in_region(None, root_w, canvas) is False
+
+    class W:
+        def __init__(self, master=None):
+            self.master = master
+
+    leaf, mid, top = W(), W(), W()
+    leaf.master, mid.master = mid, top
+    assert mw.FSSA_GUI._wheel_target_in_region(leaf, top, mid) is True
+    assert mw.FSSA_GUI._wheel_target_in_region(leaf, top, object()) is False
+    assert mw.FSSA_GUI._wheel_target_in_region(top, top, mid) is False

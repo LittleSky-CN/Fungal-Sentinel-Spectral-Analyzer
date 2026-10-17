@@ -358,6 +358,25 @@ class FSSA_GUI:
         self._btn(f, btn_text, kind="magenta", command=self.step3_analyze).pack(fill=tk.X, pady=15)
         self.lbl_status3 = self._status_label(f); self.lbl_status3.pack(anchor=tk.W)
 
+    @staticmethod
+    def _wheel_target_in_region(widget, root, target):
+        """Whether a mouse-wheel event's widget lies inside ``target``.
+
+        ``bind_all`` also receives events from Combobox popdowns and other
+        Tcl-created windows; for those ``event.widget`` is a plain widget-path
+        **string**, not a widget object, and walking ``.master`` used to raise
+        ``AttributeError: 'str' object has no attribute 'master'`` on every
+        wheel tick over the dye dropdown. Such widgets are by definition
+        outside the region, so let them keep the default behaviour.
+        """
+        if isinstance(widget, str):
+            return False
+        while widget is not None and widget is not root:
+            if widget is target:
+                return True
+            widget = widget.master
+        return False
+
     def _setup_page4(self):
         f = self.page4
         self._head_label(f, "Step 4: Concentration Quantification", "red").pack(anchor=tk.W, pady=(0, 10))
@@ -383,11 +402,7 @@ class FSSA_GUI:
 
         # 【修复2】恢复滚轮绑定，且仅当指针位于标准品列表内才生效
         def _in_std(widget):
-            while widget is not None and widget is not self.root:
-                if widget is self.std_canvas:
-                    return True
-                widget = widget.master
-            return False
+            return self._wheel_target_in_region(widget, self.root, self.std_canvas)
 
         def _on_mousewheel(event):
             if not _in_std(event.widget):
@@ -788,8 +803,12 @@ class FSSA_GUI:
             self.curve_preset = preset
             self.current_fluorophore = preset["fluorophore"]
             if not self.is_turbidity_mode:
+                # 预设加载时把下拉框同步到曲线自带的荧光素，但**不要锁死**：
+                # calculate_with_curve_preset 用的是 preset["fluorophore"]，
+                # 与 Step 3 当前选什么完全无关（日志也会报 Preset fluorophore），
+                # 锁死只会让用户在 Step 3 无法分析别的染料（下拉能展开、选择却
+                # 不生效，看起来就像"填了数据没改 UI"）。
                 self.fluor_combo.set(self.current_fluorophore)
-                self.fluor_combo.config(state="disabled")
             self.btn_calc_conc.config(text="Calculate with Curve Preset")
             self.btn_clear_curve_preset.config(state="normal")
             self.lbl_curve_preset.config(
@@ -852,8 +871,8 @@ class FSSA_GUI:
         self.btn_calc_conc.config(text="Build Curve & Calculate")
         self.btn_clear_curve_preset.config(state="disabled")
         self.lbl_curve_preset.config(text="No curve preset loaded")
-        if not self.is_turbidity_mode:
-            self.fluor_combo.config(state="readonly")
+        # 荧光素下拉框不再随曲线预设 lock/unlock：calculate_with_curve_preset
+        # 用曲线自带的 fluorophore，与 Step 3 的选择无关。
         self.log_status(4, "Curve preset cleared.", "gray")
 
     # ================= Core Signal Extraction =================
