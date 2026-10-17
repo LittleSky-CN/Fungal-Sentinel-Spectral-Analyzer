@@ -1,5 +1,5 @@
 # config.py
-"""FSSA v1.4.5 Global Configuration."""
+"""FSSA v1.4.6 Global Configuration."""
 
 # =============================================================================
 # 荧光蛋白/目标物数据库 (Fluorophore Database)

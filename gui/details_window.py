@@ -1,5 +1,5 @@
 # gui/details_window.py
-"""FSSA v1.4.5 Detailed Analysis Report.
+"""FSSA v1.4.6 Detailed Analysis Report.
 Tab 2 fixed: Figure 4a-4d with ONE continuous pointwise-fused curve
 (weights response-proportional, sum = 1, no cross-wavelength smoothing).
 """
@@ -63,7 +63,7 @@ def _safe_div(a, b):
 class DetailsWindow:
     def __init__(self, parent, cache1, cache2, cache3, cache4, mapping):
         self.win = tk.Toplevel(parent)
-        self.win.title("FSSA v1.4.5 — Detailed Analysis Report & Parameters")
+        self.win.title("FSSA v1.4.6 — Detailed Analysis Report & Parameters")
         self.win.geometry("2000x2000")
         if _THEME_ON:
             _theme.tint(self.win)

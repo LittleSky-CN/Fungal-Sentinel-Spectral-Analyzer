@@ -1,0 +1,21 @@
+# Source distribution extras - everything a user needs to rebuild/run from source.
+# (The wheel intentionally ships code only; see [tool.setuptools] in pyproject.toml.)
+
+include LICENSE
+include README.md
+include requirements.txt
+include pyproject.toml
+
+# Runtime assets consumed by gui/app_icon.py (missing files degrade gracefully).
+recursive-include assets *.ico *.png *.ttf
+
+recursive-include core *.py
+recursive-include gui *.py
+
+# Keep tests out of the wheel, make them available to anyone auditing from source.
+prune tests/__pycache__
+prune */__pycache__
+prune .pytest_cache
+
+global-exclude *.py[cod]
+global-exclude __pycache__

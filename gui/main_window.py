@@ -1,5 +1,5 @@
 # gui/main_window.py
-"""Main GUI Window for FSSA v1.4.5 (Spectral Unmixing LoD + Weighted Fusion + Turbidity).
+"""Main GUI Window for FSSA v1.4.6 (Spectral Unmixing LoD + Weighted Fusion + Turbidity).
 Theme-aware (gui/theme.py optional): neon-pop look when enabled, classic look otherwise.
 """
 import re
@@ -16,7 +16,8 @@ from scipy.stats import linregress
 
 from config import FLUOROPHORES
 from core.image_processing import (
-    get_exposure_time, read_dng_linear_rgb, auto_detect_x_roi, get_average_profiles,
+    get_exposure_time, read_dng_linear_rgb, read_dng_frame, auto_detect_x_roi,
+    get_average_profiles, calibrate_wavelength, apply_rb_swap,
     parse_known_wavelengths, find_peak_auto, make_channel_profiles,
     load_true_spd_data, np_trapz
 )
@@ -26,6 +27,11 @@ from core.calibration import (
 )
 from core.quantification import calculate_concentration
 from core.curve_preset import load_curve_preset as read_curve_preset, save_curve_preset
+from core.wavelength_preset import (
+    load_wavelength_preset as read_wavelength_preset,
+    save_wavelength_preset as write_wavelength_preset,
+    mapping_drift_nm, mapping_from_preset,
+)
 from core.unmixing import (unmix_spectrum, select_reference_emission,
                            default_unmix_window, slope_t_statistic)
 from gui.widgets import MultiFileSelector
@@ -54,7 +60,7 @@ class FSSA_GUI:
         self.is_turbidity_mode = (analysis_mode == "turbidity")
 
         title_suffix = "TURBIDITY" if self.is_turbidity_mode else analysis_mode.upper()
-        self.root.title(f"Fungal Sentinel Spectral Analyzer (FSSA) v1.4.5 [{title_suffix}] - iGEM 2026")
+        self.root.title(f"Fungal Sentinel Spectral Analyzer (FSSA) v1.4.6 [{title_suffix}] - iGEM 2026")
         self.root.geometry("1600x950")
         self.root.minsize(1400, 900)
 
@@ -63,6 +69,8 @@ class FSSA_GUI:
         self.mapping = None
         self.x_roi = None
         self.calibrator = None
+        self.spd_params_path = None      # 最近一次导入/导出的 SPD preset 路径（供 Mode B 重算）
+        self.rb_swapped = False           # 【v1.4.6】Step 1 反序自检结论，驱动后续帧的 R/B 重标注
         self.current_fluorophore = "Ypet (Venus variant)"
         self.current_page = 1
         self.current_chart_filename = "FSSA_Chart"
@@ -158,10 +166,10 @@ class FSSA_GUI:
         if _THEME_ON:
             self.banner = _theme.StepBanner(left_frame)
             self.banner.pack(fill=tk.X, pady=(10, 0))
-            ttk.Label(left_frame, text=f"FSSA v1.4.5  [{self.analysis_mode.upper()}]",
+            ttk.Label(left_frame, text=f"FSSA v1.4.6  [{self.analysis_mode.upper()}]",
                       style="Title.TLabel").pack(pady=(6, 0))
         else:
-            ttk.Label(left_frame, text=f"FSSA v1.4.5\n({self.analysis_mode.upper()})",
+            ttk.Label(left_frame, text=f"FSSA v1.4.6\n({self.analysis_mode.upper()})",
                       font=("Arial", 14, "bold")).pack(pady=15)
 
         self.content_frame = ttk.Frame(left_frame)
@@ -226,7 +234,7 @@ class FSSA_GUI:
 
         self.fig = Figure(figsize=(8, 5), dpi=100)
         self.ax = self.fig.add_subplot(111)
-        self.ax.set_title("Welcome to FSSA v1.4.5\nPlease proceed with Step 1: Positioning.")
+        self.ax.set_title("Welcome to FSSA v1.4.6\nPlease proceed with Step 1: Positioning.")
         self.ax.axis('off')
         self._style_fig(self.fig)
         self.canvas_plot = FigureCanvasTkAgg(self.fig, master=right_frame)
@@ -278,6 +286,14 @@ class FSSA_GUI:
         self.lbl_txt = self._sub_label(txt_frame, "Default"); self.lbl_txt.pack(side=tk.LEFT, padx=5)
         self.lbl_txt.config(foreground=self._dyn_fg("gray"))
         self._btn(f, "Run Wavelength Calibration", kind="magenta", command=self.step1_calibrate).pack(fill=tk.X, pady=15)
+
+        io_frame_step1 = ttk.Frame(f)
+        io_frame_step1.pack(fill=tk.X, pady=5)
+        self._btn(io_frame_step1, "💾 Export WL Params", kind="yellow",
+                  command=self.save_wavelength_preset).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=2)
+        self._btn(io_frame_step1, "📂 Load WL Params", kind="yellow",
+                  command=self.load_wavelength_preset).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=2)
+
         self.lbl_status1 = self._status_label(f); self.lbl_status1.pack(anchor=tk.W)
 
     def _setup_page2(self):
@@ -460,6 +476,71 @@ class FSSA_GUI:
                 messagebox.showinfo("Success", f"Saved to:\n{file_path}")
             except Exception as e: messagebox.showerror("Error", str(e))
 
+    # ================= Wavelength Params Persistence (Step 1 preset) =================
+    def save_wavelength_preset(self):
+        if self.mapping is None:
+            messagebox.showwarning("Warning", "Please run Wavelength Calibration first!")
+            return
+        file_path = filedialog.asksaveasfilename(
+            title="Export Wavelength Preset", initialfile="wavelength_calibration.json",
+            defaultextension=".json", filetypes=[("JSON Preset", "*.json")])
+        if not file_path:
+            return
+        try:
+            cache = self.cache_step1 or {}
+            known_wls = cache.get("known_wls")
+            if known_wls is None:
+                known_wls = {key: value.wavelength_nm
+                             for key, value in parse_known_wavelengths(self.txt_file).items()}
+            write_wavelength_preset(
+                file_path, self.mapping,
+                name=Path(file_path).stem,
+                validation=cache.get("validation"),
+                peaks=cache.get("peaks"),
+                x_roi=self.x_roi,
+                sensor_size=cache.get("sensor_size"),
+                known_wls=known_wls,
+                exposure_seconds=cache.get("exp_time"),
+                frames=cache.get("n_pos"),
+                rb_swapped=bool(cache.get("rb_swapped", False)),
+                analysis_mode=self.analysis_mode,
+            )
+            self.log_status(1, f"Preset exported: {Path(file_path).name}", "green")
+            messagebox.showinfo("Success", f"Wavelength preset exported to:\n{file_path}")
+        except (OSError, TypeError, ValueError, KeyError) as e:
+            messagebox.showerror("Error", f"Could not save wavelength preset:\n{e}")
+
+    def load_wavelength_preset(self):
+        file_path = filedialog.askopenfilename(
+            title="Load Wavelength Preset", filetypes=[("JSON Preset", "*.json")])
+        if not file_path:
+            return
+        try:
+            preset = read_wavelength_preset(file_path, self.analysis_mode)
+            self.mapping = mapping_from_preset(preset)
+            if preset.get("roiStart") is not None and preset.get("roiEnd") is not None:
+                self.x_roi = (int(preset["roiStart"]), int(preset["roiEnd"]))
+            g_error = preset.get("gErrorNm")
+            status = f"Loaded from {Path(file_path).name}"
+            if g_error is not None:
+                status += f" | G-err {g_error:+.2f} nm"
+            self.log_status(1, status, "green")
+            self.cache_step1 = dict(self.cache_step1 or {})
+            self.cache_step1.update({"mapping": self.mapping, "preset": preset})
+
+            # 已加载过 SPD preset 时，用新映射重算响应（Mode B），使两者保持一致
+            if self.spd_params_path and Path(self.spd_params_path).is_file():
+                try:
+                    self._load_spd_params_from(self.spd_params_path, silent=True)
+                except (OSError, TypeError, ValueError, KeyError) as spd_exc:
+                    self.log_status(2, f"SPD recompute skipped: {spd_exc}", "orange")
+
+            messagebox.showinfo("Success",
+                                f"Wavelength preset loaded from:\n{file_path}\n"
+                                "Step 2 / Step 3 now use the restored mapping.")
+        except (OSError, TypeError, ValueError, KeyError) as e:
+            messagebox.showerror("Error", f"Could not load wavelength preset:\n{e}")
+
     # ================= SPD Params Persistence =================
     def export_spd_params(self):
         if not self.calibrator or self.calibrator.response_R is None:
@@ -470,47 +551,105 @@ class FSSA_GUI:
         if file_path:
             try:
                 self.calibrator.save_params(file_path)
-                messagebox.showinfo("Success", f"SPD parameters exported to:\n{file_path}")
+                self.spd_params_path = file_path
+                messagebox.showinfo(
+                    "Success",
+                    f"SPD parameters exported to:\n{file_path}\n"
+                    "含波长映射与原始灯谱，可跨会话按当前映射重算。")
             except Exception as e:
                 messagebox.showerror("Error", str(e))
 
     def load_spd_params(self):
+        if self.mapping is None:
+            messagebox.showwarning(
+                "Warning",
+                "Please run (or load) Step 1 Wavelength Calibration first!\n"
+                "SPD 参数必须配合波长映射才能使用。")
+            return
         file_path = filedialog.askopenfilename(title="Load SPD Parameters", filetypes=[("JSON Params", "*.json")])
         if not file_path: return
         try:
-            self.calibrator = SpectralResponseCalibrator.load_params(file_path, self.mapping)
-            self.cache_step2 = {
-                "wavelengths": self.calibrator.wavelengths,
-                "R": self.calibrator.response_R, "G": self.calibrator.response_G, "B": self.calibrator.response_B,
-                "spd_threshold_ratio": self.calibrator.spd_threshold_ratio,
-                "smooth_window": self.calibrator.smooth_window,
-                "loaded_from_file": True,
-                # 【补充】占位键：让 details 窗口不报错，但 _build_tab2 的 else 分支会显示提示
-                "measured_total": None,
-                "corrected_total": None,
-                "pos_R": None, "pos_G": None, "pos_B": None,
-            }
-            self.log_status(2, f"Loaded from {Path(file_path).name}", "green")
+            self._load_spd_params_from(file_path)
+        except (OSError, TypeError, ValueError, KeyError) as e:
+            messagebox.showerror("Error", f"Failed to load SPD params: {str(e)}")
+
+    def _load_spd_params_from(self, file_path, silent=False):
+        """Load an SPD preset without touching ``self.calibrator`` until it validates.
+
+        【v1.4.6 修复】旧实现先赋值再校验，校验失败时 ``self.calibrator`` 已被污染。
+        """
+        calibrator = SpectralResponseCalibrator.load_params(file_path, self.mapping, strict=True)
+        previous = self.calibrator
+        self.calibrator = calibrator
+        self.spd_params_path = file_path
+        self.cache_step2 = {
+            "wavelengths": calibrator.wavelengths,
+            "R": calibrator.response_R, "G": calibrator.response_G, "B": calibrator.response_B,
+            "spd_threshold_ratio": calibrator.spd_threshold_ratio,
+            "smooth_window": calibrator.smooth_window,
+            "loaded_from_file": True,
+            # 【补充】占位键：让 details 窗口不报错，但 _build_tab2 的 else 分支会显示提示
+            "measured_total": None,
+            "corrected_total": None,
+            "pos_R": None, "pos_G": None, "pos_B": None,
+            # 【v1.4.6】Mode B 重算需要的原始输入
+            "lamp_R": calibrator.lamp_rgb[:, 0] if calibrator.lamp_rgb is not None else None,
+            "lamp_G": calibrator.lamp_rgb[:, 1] if calibrator.lamp_rgb is not None else None,
+            "lamp_B": calibrator.lamp_rgb[:, 2] if calibrator.lamp_rgb is not None else None,
+            "spd_aligned": calibrator.spd_aligned,
+            "final_mask": calibrator.final_mask,
+            "recomputed": calibrator.recomputed,
+        }
+        status = f"Loaded from {Path(file_path).name}"
+        if calibrator.recomputed:
+            status += " | Mode B recomputed"
+        self.log_status(2, status, "green")
+        if not self._report_spd_drift(calibrator):     # SEVERE 且用户取消 -> 回滚
+            self.calibrator = previous
+            self.spd_params_path = None
+            self.cache_step2 = {}
+            self.log_status(2, "Load cancelled (severe mapping drift).", "orange")
+            return False
+        if not silent:
             messagebox.showinfo("Success", "SPD parameters loaded successfully!\nNote: fusion/comparison charts need a fresh calibration.")
 
-            wls_all = self.calibrator.wavelengths
-            r_all, g_all, b_all = self.calibrator.response_R, self.calibrator.response_G, self.calibrator.response_B
-            vmask = (r_all > 0) | (g_all > 0) | (b_all > 0)
-            if np.any(vmask):
-                wp, rp, gp, bp = wls_all[vmask], r_all[vmask], g_all[vmask], b_all[vmask]
-            else:
-                wp, rp, gp, bp = wls_all, r_all, g_all, b_all
-            self.ax.clear()
-            self.ax.plot(wp, rp, 'r-', label='R (Absolute, Loaded)')
-            self.ax.plot(wp, gp, 'g-', label='G (Absolute, Loaded)')
-            self.ax.plot(wp, bp, 'b-', label='B (Absolute, Loaded)')
-            self.set_chart_title("Step 2: Per-Channel Absolute Response (Loaded)")
-            self.ax.set_xlabel("Wavelength (nm)"); self.ax.set_ylabel("Sensitivity (a.u. / SPD unit)")
-            margin = (wp[-1] - wp[0]) * 0.05
-            self.ax.set_xlim(wp[0] - margin, wp[-1] + margin)
-            self.ax.legend(); self._style_fig(self.fig); self.fig.tight_layout(); self.canvas_plot.draw()
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to load SPD params: {str(e)}")
+        wls_all = calibrator.wavelengths
+        r_all, g_all, b_all = calibrator.response_R, calibrator.response_G, calibrator.response_B
+        vmask = (r_all > 0) | (g_all > 0) | (b_all > 0)
+        if np.any(vmask):
+            wp, rp, gp, bp = wls_all[vmask], r_all[vmask], g_all[vmask], b_all[vmask]
+        else:
+            wp, rp, gp, bp = wls_all, r_all, g_all, b_all
+        self.ax.clear()
+        self.ax.plot(wp, rp, 'r-', label='R (Absolute, Loaded)')
+        self.ax.plot(wp, gp, 'g-', label='G (Absolute, Loaded)')
+        self.ax.plot(wp, bp, 'b-', label='B (Absolute, Loaded)')
+        self.set_chart_title("Step 2: Per-Channel Absolute Response (Loaded)")
+        self.ax.set_xlabel("Wavelength (nm)"); self.ax.set_ylabel("Sensitivity (a.u. / SPD unit)")
+        margin = (wp[-1] - wp[0]) * 0.05
+        self.ax.set_xlim(wp[0] - margin, wp[-1] + margin)
+        self.ax.legend(); self._style_fig(self.fig); self.fig.tight_layout(); self.canvas_plot.draw()
+        return True
+
+    def _report_spd_drift(self, calibrator):
+        """L3 分级提示（软 WARN，永不拒绝）。返回 False 表示用户在 SEVERE 确认框中取消。"""
+        drift = getattr(calibrator, "drift_nm", None)
+        level = getattr(calibrator, "drift_level", "UNKNOWN")
+        if drift is None or level in ("OK", "UNKNOWN"):
+            return True
+        if level == "WARN":
+            self.log_status(2, f"Loaded | mapping drift {drift:.2f} nm (WARN)", "orange")
+            messagebox.showwarning(
+                "波长映射已漂移",
+                f"波长映射已漂移 {drift:.1f} nm。\n"
+                "SPD 校正可能有偏差，建议重做 Step 2。")
+            return True
+        # SEVERE
+        self.log_status(2, f"Loaded | mapping drift {drift:.2f} nm (SEVERE)", "orange")
+        return messagebox.askyesno(
+            "波长映射严重漂移",
+            f"波长映射已漂移 {drift:.1f} nm（疑似更换了设备或定位图）。\n"
+            "继续将使用旧标定，定量结果不可靠。是否继续？")
 
     def export_curve_preset(self):
         if not self.cache_step4:
@@ -575,7 +714,7 @@ class FSSA_GUI:
         ch_name = fluor_config['channel']
         ch_idx = {"red": 0, "green": 1, "blue": 2}[ch_name]
         rgb_s, _ = read_dng_linear_rgb(sample_path)
-        prof_s = make_channel_profiles(rgb_s, self.x_roi)
+        prof_s = apply_rb_swap(make_channel_profiles(rgb_s, self.x_roi), self.rb_swapped)
         sample_rgb = np.column_stack([prof_s[c] for c in ["red", "green", "blue"]])
         net_rgb = np.clip(sample_rgb - avg_blank_rgb, 0, None)
         y_pixels = np.arange(len(net_rgb))
@@ -604,7 +743,7 @@ class FSSA_GUI:
         sample_profiles = []
         for sample_path in sample_paths:
             rgb, _ = read_dng_linear_rgb(sample_path)
-            profiles = make_channel_profiles(rgb, self.x_roi)
+            profiles = apply_rb_swap(make_channel_profiles(rgb, self.x_roi), self.rb_swapped)
             sample_profiles.append(np.column_stack([profiles[c] for c in ["red", "green", "blue"]]))
 
         if any(profile.shape != blank_rgb.shape for profile in sample_profiles):
@@ -635,7 +774,7 @@ class FSSA_GUI:
         specs, wls_out = [], None
         for p in paths:
             rgb_s, _ = read_dng_linear_rgb(p)
-            prof = make_channel_profiles(rgb_s, self.x_roi)
+            prof = apply_rb_swap(make_channel_profiles(rgb_s, self.x_roi), self.rb_swapped)
             spec_rgb = np.column_stack([prof[c] for c in ["red", "green", "blue"]])
             y_pixels = np.arange(len(spec_rgb))
             wavelengths = self.mapping.pixel_to_wavelength(y_pixels)
@@ -656,26 +795,40 @@ class FSSA_GUI:
         self.log_status(1, "Calibrating...", "orange")
         try:
             knowns = parse_known_wavelengths(self.txt_file)
-            rgb_first, exp_first = read_dng_linear_rgb(pos_files[0])
-            self.x_roi = auto_detect_x_roi(rgb_first)
+            frame = read_dng_frame(pos_files[0])
+            rgb_first, exp_first = frame["rgb"], frame["exposure"]
+            self.x_roi = frame["x_roi"]
             avg_profiles = get_average_profiles(pos_files, self.x_roi)
-            peaks = [find_peak_auto(avg_profiles[knowns[k].channel_name], knowns[k]) for k in ["R", "G", "B"]]
-            p1 = next(p for p in peaks if p.name == "B")
-            p2 = next(p for p in peaks if p.name == "R")
-            hold = next(p for p in peaks if p.name == "G")
-            k = (p2.y_centroid - p1.y_centroid) / (p2.wavelength_nm - p1.wavelength_nm)
-            b = p1.y_centroid - k * p1.wavelength_nm
+            # 【v1.4.6】两点拟合 + R/B 反序自检（与 Android WavelengthCalibrator 一致）
+            fit = calibrate_wavelength(avg_profiles, knowns)
+            if fit is None:
+                raise RuntimeError("No usable R/G/B peaks in the positioning frame.")
+            peaks = list(fit["peaks"])
+            k, b = fit["k"], fit["b"]
             self.mapping = LinearMapping(k, b)
-            pred_y = k * hold.wavelength_nm + b
-            res_px = hold.y_centroid - pred_y
-            wl_err = res_px / abs(k)
+            hold = peaks[1]
+            pred_y = fit["predicted"]
+            res_px = fit["residual"]
+            wl_err = fit["error_nm"]
+            rb_swapped = bool(fit["swapped"])
+            self.rb_swapped = rb_swapped
+            avg_profiles = apply_rb_swap(avg_profiles, rb_swapped)
             validation = TwoPointValidation(("B", "R"), "G", k, b, pred_y, hold.y_centroid, res_px, wl_err)
             self.log_status(1, f"Done! Exp: {exp_first:.4f}s | G-err: {wl_err:+.2f} nm", "green")
-            log_text = f"\n=== Step 1: Wavelength Calibration ===\nExposure Time Normalized: {exp_first:.4f}s\nMapping: p = {k:.4f} * λ + {b:.2f}\nG-point Error: {wl_err:+.2f} nm\n"
+            log_text = (f"\n=== Step 1: Wavelength Calibration ===\n"
+                        f"Exposure Time Normalized: {exp_first:.4f}s\n"
+                        f"CFA: {frame['cfa']} | R/B swapped: {rb_swapped}\n"
+                        f"Mapping: p = {k:.4f} * λ + {b:.2f}\n"
+                        f"G-point Error: {wl_err:+.2f} nm ({fit['quality']})\n")
             self.txt_result.insert(tk.END, log_text); self.txt_result.see(tk.END)
+            # 【v1.4.6】sensor_size=(width, height) 与 known_wls 供 Step 1 preset 落盘
             self.cache_step1 = {"rgb": rgb_first, "x_roi": self.x_roi, "profiles": avg_profiles, "peaks": peaks,
                                 "mapping": self.mapping, "validation": validation, "exp_time": exp_first,
-                                "wl_err": wl_err, "n_pos": len(pos_files)}
+                                "wl_err": wl_err, "n_pos": len(pos_files),
+                                "sensor_size": (int(rgb_first.shape[1]), int(rgb_first.shape[0])),
+                                "known_wls": {name: knowns[name].wavelength_nm
+                                              for name in ("R", "G", "B")},
+                                "rb_swapped": rb_swapped, "cfa": frame["cfa"]}
             self.ax.clear()
             colors = {"red": "red", "green": "green", "blue": "blue"}
             cc = self._centroid_color()
@@ -696,7 +849,8 @@ class FSSA_GUI:
         if not spd_files: messagebox.showwarning("Warning", "Please add SPD DNG(s)!"); return
         self.log_status(2, "Calibrating Response...", "orange")
         try:
-            avg_spd_rgb_dict = get_average_profiles(spd_files, self.x_roi)
+            avg_spd_rgb_dict = apply_rb_swap(get_average_profiles(spd_files, self.x_roi),
+                                              self.rb_swapped)
             y_pixels = np.arange(len(avg_spd_rgb_dict["red"]), dtype=np.float64)
             measured_rgb = np.column_stack((avg_spd_rgb_dict["red"], avg_spd_rgb_dict["green"], avg_spd_rgb_dict["blue"]))
             true_wl, true_val = None, None
@@ -705,6 +859,11 @@ class FSSA_GUI:
 
             self.calibrator = SpectralResponseCalibrator(self.mapping)
             self.calibrator.calibrate(y_pixels, measured_rgb, true_wl, true_val)
+            # 【v1.4.6】溯源字段：写进 SPD preset，供加载端做漂移提示与 Mode B 重算
+            self.calibrator.spd_source = Path(self.csv_file).name if self.csv_file else None
+            self.calibrator.x_roi = tuple(int(v) for v in self.x_roi) if self.x_roi else None
+            self.calibrator.g_error_nm = self.cache_step1.get("wl_err")
+            self.calibrator.rb_swapped = bool(self.cache_step1.get("rb_swapped", False))
 
             wl_order_check = self.mapping.pixel_to_wavelength(y_pixels)
             lamp_aligned = measured_rgb[::-1, :] if wl_order_check[0] > wl_order_check[-1] else measured_rgb
@@ -731,6 +890,7 @@ class FSSA_GUI:
                 "lamp_R": lamp_aligned[:, 0], "lamp_G": lamp_aligned[:, 1], "lamp_B": lamp_aligned[:, 2],
                 "lamp_R_n": len(spd_files),
                 "spd_aligned": self.calibrator.spd_aligned,
+                "spd_reference": self.calibrator.spd_reference,
                 "final_mask": self.calibrator.final_mask,
                 "spd_threshold_ratio": self.calibrator.spd_threshold_ratio,
                 "smooth_window": self.calibrator.smooth_window,

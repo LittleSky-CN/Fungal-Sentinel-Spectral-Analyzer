@@ -1,0 +1,14 @@
+# FSSA v1.4.6 runtime dependencies.
+#
+# These mirror the [project.dependencies] block in pyproject.toml so that a
+# plain `pip install -r requirements.txt` reproduces the same environment that
+# `pip install fssa` would create.
+#
+# tkinter ships with CPython on Windows/macOS; on Debian/Ubuntu install it with:
+#   sudo apt-get install python3-tk
+
+numpy>=1.24
+scipy>=1.10
+matplotlib>=3.7
+opencv-python-headless>=4.8
+tifffile>=2023.7.10
