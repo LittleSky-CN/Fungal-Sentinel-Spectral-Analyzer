@@ -1,4 +1,4 @@
-# FSSA v1.4.6 runtime dependencies.
+# FSSA v1.4.7 runtime dependencies.
 #
 # These mirror the [project.dependencies] block in pyproject.toml so that a
 # plain `pip install -r requirements.txt` reproduces the same environment that

@@ -26,7 +26,7 @@ from core.calibration import LinearMapping
 
 SCHEMA_VERSION = 1
 PRESET_TYPE = "WAVELENGTH"
-APP_VERSION = "1.4.6"
+APP_VERSION = "1.4.7"
 
 #: ``pixel_to_wavelength`` divides by the slope; anything flatter is unusable.
 MIN_ABS_SLOPE = 1e-6

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fssa"
-version = "1.4.6"
+version = "1.4.7"
 description = "FSSA (Fungal Sentinel Spectral Analyzer) - offline-first desktop pipeline for smartphone-DNG grating fluorescence spectroscopy"
 readme = "README.md"
 requires-python = ">=3.10"

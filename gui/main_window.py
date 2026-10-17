@@ -1,8 +1,9 @@
 # gui/main_window.py
-"""Main GUI Window for FSSA v1.4.6 (Spectral Unmixing LoD + Weighted Fusion + Turbidity).
+"""Main GUI Window for FSSA v1.4.7 (Spectral Unmixing LoD + Weighted Fusion + Turbidity).
 Theme-aware (gui/theme.py optional): neon-pop look when enabled, classic look otherwise.
 """
 import re
+import time
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 from pathlib import Path
@@ -60,7 +61,7 @@ class FSSA_GUI:
         self.is_turbidity_mode = (analysis_mode == "turbidity")
 
         title_suffix = "TURBIDITY" if self.is_turbidity_mode else analysis_mode.upper()
-        self.root.title(f"Fungal Sentinel Spectral Analyzer (FSSA) v1.4.6 [{title_suffix}] - iGEM 2026")
+        self.root.title(f"Fungal Sentinel Spectral Analyzer (FSSA) v1.4.7 [{title_suffix}] - iGEM 2026")
         self.root.geometry("1600x950")
         self.root.minsize(1400, 900)
 
@@ -81,8 +82,15 @@ class FSSA_GUI:
         self.cache_step3 = {}
         self.cache_step4 = {}
         self.curve_preset = None
-        
+        # 【v1.4.7】turbidity 模式不建 Step 4，这三个句柄保持 None；预设按钮随之隐藏
+        self.curve_preset_frame = None
+        self.btn_clear_curve_preset = None
+        self.lbl_curve_preset = None
+        # 【溯源】记录每一步参数来自导入的 preset 还是本次现场标定
+        self.preset_provenance = {"step1": None, "step2": None, "step3": None, "step4": None}
+
         self.turbidity_window = None
+        self.details_window = None
         self._lod_headline = None
 
         # 【主题】仅在此处应用全局样式（必须在 setup_ui 之前、root 存在之后）
@@ -166,10 +174,10 @@ class FSSA_GUI:
         if _THEME_ON:
             self.banner = _theme.StepBanner(left_frame)
             self.banner.pack(fill=tk.X, pady=(10, 0))
-            ttk.Label(left_frame, text=f"FSSA v1.4.6  [{self.analysis_mode.upper()}]",
+            ttk.Label(left_frame, text=f"FSSA v1.4.7  [{self.analysis_mode.upper()}]",
                       style="Title.TLabel").pack(pady=(6, 0))
         else:
-            ttk.Label(left_frame, text=f"FSSA v1.4.6\n({self.analysis_mode.upper()})",
+            ttk.Label(left_frame, text=f"FSSA v1.4.7\n({self.analysis_mode.upper()})",
                       font=("Arial", 14, "bold")).pack(pady=15)
 
         self.content_frame = ttk.Frame(left_frame)
@@ -188,21 +196,25 @@ class FSSA_GUI:
 
         self.max_steps = 3 if self.is_turbidity_mode else 4
 
-        self.curve_preset_frame = ttk.Frame(left_frame)
-        preset_buttons = ttk.Frame(self.curve_preset_frame)
-        preset_buttons.pack(fill=tk.X)
-        self._btn(preset_buttons, "Save Curve Preset", kind="yellow",
-                  command=self.export_curve_preset).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(0, 2))
-        self._btn(preset_buttons, "Load Curve Preset", kind="yellow",
-                  command=self.load_curve_preset).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(2, 0))
-        self.btn_clear_curve_preset = self._btn(
-            self.curve_preset_frame, "Clear Loaded Preset", kind="pale",
-            command=self.clear_curve_preset)
-        self.btn_clear_curve_preset.pack(fill=tk.X, pady=(3, 0))
-        self.btn_clear_curve_preset.config(state="disabled")
-        self.lbl_curve_preset = self._sub_label(
-            self.curve_preset_frame, "No curve preset loaded", wraplength=460)
-        self.lbl_curve_preset.pack(anchor=tk.W, pady=(2, 0))
+        # 【v1.4.7】Step 4 专属：turbidity 模式没有 Step 4 页面，三个预设按钮必须一起隐藏，
+        # 否则用户能点到 load_curve_preset() → calculate_concentration()，去碰从未初始化的
+        # Step 4 控件（std_rows / btn_calc_conc / txt_result ...）。句柄保持 None，引用处判空。
+        if not self.is_turbidity_mode:
+            self.curve_preset_frame = ttk.Frame(left_frame)
+            preset_buttons = ttk.Frame(self.curve_preset_frame)
+            preset_buttons.pack(fill=tk.X)
+            self._btn(preset_buttons, "Save Curve Preset", kind="yellow",
+                      command=self.export_curve_preset).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(0, 2))
+            self._btn(preset_buttons, "Load Curve Preset", kind="yellow",
+                      command=self.load_curve_preset).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(2, 0))
+            self.btn_clear_curve_preset = self._btn(
+                self.curve_preset_frame, "Clear Loaded Preset", kind="pale",
+                command=self.clear_curve_preset)
+            self.btn_clear_curve_preset.pack(fill=tk.X, pady=(3, 0))
+            self.btn_clear_curve_preset.config(state="disabled")
+            self.lbl_curve_preset = self._sub_label(
+                self.curve_preset_frame, "No curve preset loaded", wraplength=460)
+            self.lbl_curve_preset.pack(anchor=tk.W, pady=(2, 0))
 
         nav_frame = ttk.Frame(left_frame)
         nav_frame.pack(fill=tk.X, padx=10, pady=15)
@@ -234,7 +246,7 @@ class FSSA_GUI:
 
         self.fig = Figure(figsize=(8, 5), dpi=100)
         self.ax = self.fig.add_subplot(111)
-        self.ax.set_title("Welcome to FSSA v1.4.6\nPlease proceed with Step 1: Positioning.")
+        self.ax.set_title("Welcome to FSSA v1.4.7\nPlease proceed with Step 1: Positioning.")
         self.ax.axis('off')
         self._style_fig(self.fig)
         self.canvas_plot = FigureCanvasTkAgg(self.fig, master=right_frame)
@@ -428,10 +440,11 @@ class FSSA_GUI:
         self.current_page = page_num
         for p in [self.page1, self.page2, self.page3, self.page4]: p.pack_forget()
         getattr(self, f"page{page_num}").pack(fill=tk.BOTH, expand=True)
-        if not self.is_turbidity_mode and page_num == 4:
-            self.curve_preset_frame.pack(fill=tk.X, padx=10, pady=(4, 0), before=self.btn_prev.master)
-        else:
-            self.curve_preset_frame.pack_forget()
+        if self.curve_preset_frame is not None:
+            if page_num == 4:
+                self.curve_preset_frame.pack(fill=tk.X, padx=10, pady=(4, 0), before=self.btn_prev.master)
+            else:
+                self.curve_preset_frame.pack_forget()
         self.lbl_page_num.config(text=f"Step {page_num} / {self.max_steps}")
         self.btn_prev.config(state="normal" if page_num > 1 else "disabled")
         self.btn_next.config(state="normal" if page_num < self.max_steps else "disabled")
@@ -462,6 +475,42 @@ class FSSA_GUI:
                      "green": _theme.GREEN, "red": "#FF5252"}.get(color, color)
         getattr(self, f"lbl_status{step}").config(text=f"Status: {msg}", foreground=color)
         self.root.update()
+
+    def _record_provenance(self, step, kind, *, preset_type=None, file_path=None,
+                           preset_name=None, params=None):
+        """记录某一步参数的来源，供报告窗口做预设溯源。
+
+        ``kind`` 为 ``"preset"``（来自导入文件）或 ``"live"``（本次现场标定）。
+        ``preset_type`` 与 Android ``PresetStorage.PresetTypes`` 保持一致：
+        ``WAVELENGTH`` / ``SPD`` / ``CURVE``。
+        """
+        if not hasattr(self, "preset_provenance") or self.preset_provenance is None:
+            self.preset_provenance = {"step1": None, "step2": None, "step3": None, "step4": None}
+        formatted = {}
+        for key, value in (params or {}).items():
+            if isinstance(value, float):
+                formatted[str(key)] = f"{value:.6g}"
+            else:
+                formatted[str(key)] = str(value)
+        self.preset_provenance[f"step{step}"] = {
+            "step": step,
+            "kind": kind,
+            "preset_type": preset_type,
+            "file": str(Path(file_path).resolve()) if file_path else None,
+            "file_name": Path(file_path).name if file_path else None,
+            "preset_name": preset_name,
+            "imported_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "params": formatted,
+        }
+
+    def _clear_provenance(self, step):
+        """清掉某一步的溯源：预设被解除或导入被回滚时调用。
+
+        报告的溯源页不能继续声称参数来自一个已经不再生效的预设文件。
+        """
+        if not isinstance(getattr(self, "preset_provenance", None), dict):
+            self.preset_provenance = {"step1": None, "step2": None, "step3": None, "step4": None}
+        self.preset_provenance[f"step{step}"] = None
 
     def set_chart_title(self, title):
         self.ax.set_title(title, fontsize=13, fontweight='bold')
@@ -527,6 +576,23 @@ class FSSA_GUI:
             self.log_status(1, status, "green")
             self.cache_step1 = dict(self.cache_step1 or {})
             self.cache_step1.update({"mapping": self.mapping, "preset": preset})
+            self._record_provenance(
+                1, "preset", preset_type="WAVELENGTH", file_path=file_path,
+                preset_name=preset.get("name") or Path(file_path).stem,
+                params={
+                    "mapping_formula": f"p = {self.mapping.slope_k:.6g} * λ + {self.mapping.intercept_b:.6g}",
+                    "rb_swapped": bool(preset.get("rbSwapped", False)),
+                    "sensor_size": (preset.get("sensorWidth"), preset.get("sensorHeight")),
+                    "x_roi": self.x_roi,
+                    "peaks": "R={}; G={}; B={}".format(
+                        preset.get("peakR"), preset.get("peakG"), preset.get("peakB")),
+                    "known_wls": "R={}; G={}; B={}".format(
+                        preset.get("wlR"), preset.get("wlG"), preset.get("wlB")),
+                    "g_error_nm": preset.get("gErrorNm"),
+                    "quality": preset.get("quality"),
+                    "exposure_seconds": preset.get("exposureSeconds"),
+                    "frames": preset.get("frames"),
+                })
 
             # 已加载过 SPD preset 时，用新映射重算响应（Mode B），使两者保持一致
             if self.spd_params_path and Path(self.spd_params_path).is_file():
@@ -608,6 +674,9 @@ class FSSA_GUI:
             self.calibrator = previous
             self.spd_params_path = None
             self.cache_step2 = {}
+            # 回滚同时丢弃 Step2 的溯源：本次导入未被采纳，
+            # 报告不能继续声称参数来自某个已被丢弃的预设文件。
+            self._clear_provenance(2)
             self.log_status(2, "Load cancelled (severe mapping drift).", "orange")
             return False
         if not silent:
@@ -629,6 +698,17 @@ class FSSA_GUI:
         margin = (wp[-1] - wp[0]) * 0.05
         self.ax.set_xlim(wp[0] - margin, wp[-1] + margin)
         self.ax.legend(); self._style_fig(self.fig); self.fig.tight_layout(); self.canvas_plot.draw()
+        self._record_provenance(
+            2, "preset", preset_type="SPD", file_path=file_path,
+            preset_name=getattr(calibrator, "name", None) or Path(file_path).stem,
+            params={
+                "drift_nm": getattr(calibrator, "drift_nm", None),
+                "drift_level": getattr(calibrator, "drift_level", "UNKNOWN"),
+                "spd_source": getattr(calibrator, "spd_source", None),
+                "recomputed": bool(getattr(calibrator, "recomputed", False)),
+                "x_roi": getattr(calibrator, "x_roi", None),
+                "g_error_nm": getattr(calibrator, "g_error_nm", None),
+            })
         return True
 
     def _report_spd_drift(self, calibrator):
@@ -669,6 +749,10 @@ class FSSA_GUI:
             messagebox.showerror("Error", f"Could not save curve preset:\n{e}")
 
     def load_curve_preset(self):
+        # 【v1.4.7】turbidity 模式没有 Step 4：按钮已隐藏，这里再兜一层，
+        # 避免任何路径（含自动化/复用实例）走进未初始化的 Step 4 控件。
+        if self.curve_preset_frame is None:
+            return
         file_path = filedialog.askopenfilename(
             title="Load Curve Preset", filetypes=[("JSON Preset", "*.json")])
         if not file_path:
@@ -678,7 +762,6 @@ class FSSA_GUI:
             if preset["fluorophore"] not in FLUOROPHORES:
                 raise ValueError("The preset fluorophore is not available in this version.")
             self.curve_preset = preset
-            self.cache_step4 = {}
             self.current_fluorophore = preset["fluorophore"]
             if not self.is_turbidity_mode:
                 self.fluor_combo.set(self.current_fluorophore)
@@ -687,16 +770,61 @@ class FSSA_GUI:
             self.btn_clear_curve_preset.config(state="normal")
             self.lbl_curve_preset.config(
                 text=f"Active: {Path(file_path).name} — standard rows ignored; Step 3 blank/sample required")
-            self.log_status(4, "Curve preset loaded; ready for Step 3 sample.", "green")
-            messagebox.showinfo(
-                "Success",
-                "Curve preset loaded. Select the current sample and blank in Step 3, "
-                "then calculate with this saved curve.")
+            self._record_provenance(
+                4, "preset", preset_type="CURVE", file_path=file_path,
+                preset_name=preset.get("name") or Path(file_path).stem,
+                params={
+                    "slope": preset["fit"].get("slope"),
+                    "intercept": preset["fit"].get("intercept"),
+                    "r2": preset["fit"].get("r_squared"),
+                    "metric_mode": preset["metric_mode"],
+                    "fluorophore": preset["fluorophore"],
+                    "n_standards": len(preset["concentrations"]),
+                    "regression_method": preset["regression_method"],
+                })
+
+            sample_files = self.sample_selector.get_files()
+            blank_files = self.blank_selector.get_files()
+            # 续跑的前提是 Step1/Step2 都已就绪，否则 calculate_with_curve_preset
+            # 只会弹一个 "Please complete Step 1 & 2 first!"，流程照样断在这里。
+            missing_steps = []
+            if self.mapping is None:
+                missing_steps.append("Step 1 (wavelength mapping)")
+            if self.calibrator is None:
+                missing_steps.append("Step 2 (SPD calibration)")
+            if missing_steps:
+                needed = " and ".join(missing_steps)
+                self.log_status(4, f"Curve preset loaded; {needed} still needed.", "orange")
+                messagebox.showinfo(
+                    "Success",
+                    f"Curve preset loaded. Complete {needed} before calculating.")
+                return
+            if sample_files and blank_files:
+                # 只有确认马上会用预设重算时才丢弃旧的现场曲线；
+                # 不能重算时保留它，用户此前算好的结果不会被无声清空。
+                self.cache_step4 = {}
+                self.log_status(4, "Preset loaded; running calculation...", "orange")
+                self.root.after(150, self.calculate_concentration)
+            else:
+                missing = []
+                if not blank_files: missing.append("blank")
+                if not sample_files: missing.append("sample")
+                self.log_status(4, "Curve preset loaded; ready for Step 3 sample.", "green")
+                messagebox.showinfo(
+                    "Success",
+                    "Curve preset loaded. Step 3 still needs a {} image — "
+                    "add it in Step 3, then calculate with this saved curve.".format(
+                        " and ".join(missing)))
         except (OSError, TypeError, ValueError, KeyError) as e:
             messagebox.showerror("Error", f"Could not load curve preset:\n{e}")
 
     def clear_curve_preset(self):
+        # 【v1.4.7】同 load_curve_preset：turbidity 模式下按钮不存在，直接跳过。
+        if self.curve_preset_frame is None:
+            return
         self.curve_preset = None
+        # 预设已解除，报告的溯源页不能再声称 Step 4 来自导入的 CURVE 预设
+        self._clear_provenance(4)
         self.btn_calc_conc.config(text="Build Curve & Calculate")
         self.btn_clear_curve_preset.config(state="disabled")
         self.lbl_curve_preset.config(text="No curve preset loaded")
@@ -841,6 +969,20 @@ class FSSA_GUI:
             self.set_chart_title("Step 1: Wavelength Calibration Profiles")
             self.ax.set_xlabel("Y Pixel"); self.ax.set_ylabel("Intensity"); self.ax.legend(fontsize=8)
             self._style_fig(self.fig); self.fig.tight_layout(); self.canvas_plot.draw()
+            self._record_provenance(
+                1, "live",
+                params={
+                    "mapping_formula": f"p = {k:.6g} * λ + {b:.6g}",
+                    "rb_swapped": rb_swapped,
+                    "cfa": frame["cfa"],
+                    "x_roi": self.x_roi,
+                    "peaks": ", ".join(
+                        f"{p.name}@{p.y_centroid:.1f}px" for p in peaks),
+                    "g_error_nm": wl_err,
+                    "quality": fit["quality"],
+                    "exposure_seconds": exp_first,
+                    "frames": len(pos_files),
+                })
         except Exception as e: self.log_status(1, f"Error: {e}", "red"); messagebox.showerror("Error", str(e))
 
     def step2_calibrate(self):
@@ -927,6 +1069,20 @@ class FSSA_GUI:
             margin = (wp[-1] - wp[0]) * 0.05
             self.ax.set_xlim(wp[0] - margin, wp[-1] + margin)
             self.ax.legend(); self._style_fig(self.fig); self.fig.tight_layout(); self.canvas_plot.draw()
+            try:
+                exp_step2 = float(np.mean([get_exposure_time(f) for f in spd_files]))
+            except Exception:
+                exp_step2 = None
+            self._record_provenance(
+                2, "live",
+                params={
+                    "frames": len(spd_files),
+                    "exposure": exp_step2,
+                    "x_roi": self.x_roi,
+                    "spd_csv": Path(self.csv_file).name if self.csv_file else None,
+                    "spd_threshold_ratio": self.calibrator.spd_threshold_ratio,
+                    "smooth_window": self.calibrator.smooth_window,
+                })
         except Exception as e: self.log_status(2, f"Error: {e}", "red"); messagebox.showerror("Error", str(e))
 
     def step3_analyze(self):
@@ -992,6 +1148,18 @@ class FSSA_GUI:
             self.set_chart_title(title)
             self.ax.set_xlabel("Wavelength (nm)"); self.ax.set_ylabel("True Intensity"); self.ax.legend()
             self._style_fig(self.fig); self.fig.tight_layout(); self.canvas_plot.draw()
+            self._record_provenance(
+                3, "live",
+                params={
+                    "blank_files": ", ".join(Path(p).name for p in blank_files),
+                    "sample_files": ", ".join(Path(p).name for p in sample_files),
+                    "n_blank": len(blank_files),
+                    "n_sample": len(sample_files),
+                    "fluorophore": None if self.is_turbidity_mode else self.current_fluorophore,
+                    "spd_status": spd_status,
+                    "mean_area": float(mean_area),
+                    "peak": float(peak),
+                })
         except Exception as e: self.log_status(3, f"Error: {e}", "red"); messagebox.showerror("Error", str(e))
 
     # ================= Step 4 =================
@@ -1149,6 +1317,11 @@ class FSSA_GUI:
             self._style_fig(self.fig)
             self.fig.tight_layout()
             self.canvas_plot.draw()
+            # preset 路径不覆盖 step4 的溯源（由 load_curve_preset 写入），只补充预测浓度
+            entry = (self.preset_provenance or {}).get("step4")
+            if isinstance(entry, dict) and entry.get("kind") == "preset":
+                entry.setdefault("params", {})["predicted_conc"] = f"{calc_result['sample_conc']:.6g}"
+            self.root.after(200, self._auto_show_report)
         except Exception as e:
             self.log_status(4, f"Error: {e}", "red")
             messagebox.showerror("Error", str(e))
@@ -1399,6 +1572,19 @@ class FSSA_GUI:
             else:
                 self.fig.tight_layout()
             self.canvas_plot.draw()
+            self._record_provenance(
+                4, "live",
+                params={
+                    "slope": calc_result.get("slope"),
+                    "intercept": calc_result.get("intercept"),
+                    "r2": calc_result.get("r_squared"),
+                    "regression_method": reg_method,
+                    "n_standards": len(concentrations),
+                    "metric_mode": metric_mode,
+                    "fluorophore": self.current_fluorophore,
+                    "predicted_conc": calc_result.get("sample_conc"),
+                })
+            self.root.after(200, self._auto_show_report)
         except Exception as e: self.log_status(4, f"Error: {e}", "red"); messagebox.showerror("Error", str(e))
 
     # ================= Windows =================
@@ -1411,8 +1597,47 @@ class FSSA_GUI:
         else:
             self.turbidity_window.win.lift(); self.turbidity_window.win.focus_force()
 
-    def show_details_window(self):
+    def _auto_show_report(self):
+        """计算成功后自动弹出报告（由 root.after 异步调度）。
+
+        ``DetailsWindow`` 在 ``__init__`` 里一次性渲染，没有 refresh 接口，所以
+        自动弹出必须强制重建：否则旧窗口只是被提到前台，报告里仍是上一次的
+        ``cache_step4`` 与上一次的溯源。
+        """
+        self.show_details_window(force_refresh=True)
+
+    def show_details_window(self, force_refresh=False):
+        """打开报告窗口。
+
+        ``force_refresh=True``：自动弹出路径，先销毁存活的旧窗口再重建，保证用户
+        看到的是最新结果。``False``（工具栏「📋 Details」手动点击）：复用旧窗口，
+        只是把它提到前台，避免反复重建打断阅读。
+        """
         if not self.mapping:
             messagebox.showinfo("Info", "Please complete at least Step 1 to view details.")
             return
-        DetailsWindow(self.root, self.cache_step1, self.cache_step2, self.cache_step3, self.cache_step4, self.mapping)
+        existing = getattr(self, "details_window", None)
+        if existing is not None and not force_refresh:
+            win = getattr(existing, "win", None)
+            try:
+                if win is not None and win.winfo_exists():
+                    win.lift()
+                    try:
+                        win.focus_force()
+                    except Exception:
+                        pass
+                    return
+            except Exception:
+                pass
+        if existing is not None:
+            win = getattr(existing, "win", None)
+            try:
+                if win is not None and win.winfo_exists():
+                    win.destroy()
+            except Exception:
+                pass
+            self.details_window = None
+        self.details_window = DetailsWindow(
+            self.root, self.cache_step1, self.cache_step2, self.cache_step3,
+            self.cache_step4, self.mapping,
+            preset_provenance=self.preset_provenance)

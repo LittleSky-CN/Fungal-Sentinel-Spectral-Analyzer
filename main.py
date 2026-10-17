@@ -1,5 +1,5 @@
 # main.py
-"""FSSA v1.4.6 Main Entry Point.
+"""FSSA v1.4.7 Main Entry Point.
 - 分析模式选择 (LoD/IUPAC、Legacy、Turbidity)
 - 可选霓虹主题 (gui/theme.py + config.py, 缺失时自动回退经典外观)
 - 统一团队图标 (gui/app_icon.py: 多尺寸透明底 .ico; Toplevel 自动继承)
@@ -65,7 +65,7 @@ class ModeSelector:
         apply_app_icon(root)            # 团队图标：初始选择窗口
         _apply_theme_if_enabled(root)
 
-        self.root.title("FSSA v1.4.6 - Analysis Mode Selection")
+        self.root.title("FSSA v1.4.7 - Analysis Mode Selection")
         self.root.geometry("600x650")
         self.root.resizable(True, True)
         self.root.eval('tk::PlaceWindow . center')

@@ -1,5 +1,5 @@
 # gui/details_window.py
-"""FSSA v1.4.6 Detailed Analysis Report.
+"""FSSA v1.4.7 Detailed Analysis Report.
 Tab 2 fixed: Figure 4a-4d with ONE continuous pointwise-fused curve
 (weights response-proportional, sum = 1, no cross-wavelength smoothing).
 """
@@ -61,9 +61,9 @@ def _safe_div(a, b):
 
 
 class DetailsWindow:
-    def __init__(self, parent, cache1, cache2, cache3, cache4, mapping):
+    def __init__(self, parent, cache1, cache2, cache3, cache4, mapping, preset_provenance=None):
         self.win = tk.Toplevel(parent)
-        self.win.title("FSSA v1.4.6 — Detailed Analysis Report & Parameters")
+        self.win.title("FSSA v1.4.7 — Detailed Analysis Report & Parameters")
         self.win.geometry("2000x2000")
         if _THEME_ON:
             _theme.tint(self.win)
@@ -72,24 +72,27 @@ class DetailsWindow:
         self.cache3 = cache3 or {}
         self.cache4 = cache4 or {}
         self.mapping = mapping
+        self.preset_provenance = preset_provenance or {}
         self._active_canvas = None
 
         self.notebook = ttk.Notebook(self.win)
         self.notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
-        self.fig1 = self.fig2 = self.fig3 = self.fig4 = None
+        self.fig1 = self.fig2 = self.fig3 = self.fig4 = self.fig5 = None
         self.fig1_params = self.fig2_params = self.fig3_params = self.fig4_params = None
 
         self._build_tab1()
         self._build_tab2()
         self._build_tab3()
         self._build_tab4()
+        self._build_tab5()
 
         btn_frame = ttk.Frame(self.win)
         btn_frame.pack(fill=tk.X, padx=10, pady=10)
         figs_to_export = [f for f in (
             self.fig1, self.fig1_params, self.fig2, self.fig2_params,
-            self.fig3, self.fig3_params, self.fig4, self.fig4_params) if f is not None]
+            self.fig3, self.fig3_params, self.fig4, self.fig4_params,
+            self.fig5) if f is not None]
         if _THEME_ON:
             ttk.Button(btn_frame, text="📥 Export Full Report (PDF)", style="Magenta.TButton",
                        command=lambda: self.export_pdf_report(figs_to_export)).pack(side=tk.LEFT)
@@ -170,15 +173,15 @@ class DetailsWindow:
         widget.bind("<Leave>", lambda e: self._set_active_canvas(None))
         return widget
 
-    def _add_param_panel(self, tab, content):
-        frame = ttk.LabelFrame(tab, text="Calculated Parameters & Debug Info", padding=5)
+    def _add_param_panel(self, tab, content, title=None, height=8):
+        frame = ttk.LabelFrame(tab, text=title or "Calculated Parameters & Debug Info", padding=5)
         frame.pack(fill=tk.X, padx=5, pady=(0, 8))
         if _THEME_ON:
-            txt = tk.Text(frame, height=8, font=_theme.MONO, wrap=tk.WORD,
+            txt = tk.Text(frame, height=height, font=_theme.MONO, wrap=tk.WORD,
                           bg=_theme.CREAM, fg=_theme.INK, relief="flat",
                           highlightthickness=1, highlightbackground=_theme.CYAN)
         else:
-            txt = tk.Text(frame, height=8, font=("Consolas", 10), wrap=tk.WORD, bg="#f8f9fa")
+            txt = tk.Text(frame, height=height, font=("Consolas", 10), wrap=tk.WORD, bg="#f8f9fa")
         txt.pack(fill=tk.X)
         txt.insert("1.0", content)
         txt.config(state=tk.DISABLED)
@@ -194,6 +197,23 @@ class DetailsWindow:
         ax = fig.add_subplot(111); ax.axis("off")
         ax.set_title(title, fontsize=16, fontweight="bold", pad=20, color=tcol)
         fig.text(0.05, 0.85, params_text, fontsize=11, family="monospace",
+                 verticalalignment="top", color=tcol)
+        return fig
+
+    def _create_provenance_figure(self, title, params_text):
+        """Same look as :meth:`_create_params_figure`, but the canvas grows with
+        the number of lines so the provenance page is never clipped in the PDF."""
+        n_lines = params_text.count("\n") + 1
+        height = max(6.0, min(40.0, 1.6 + 0.22 * n_lines))
+        fig = Figure(figsize=(15, height), dpi=100)
+        tcol = "black"
+        if _THEME_ON:
+            fig.patch.set_facecolor(_theme.CREAM); tcol = _theme.INK
+        else:
+            fig.patch.set_facecolor("white")
+        ax = fig.add_subplot(111); ax.axis("off")
+        ax.set_title(title, fontsize=16, fontweight="bold", pad=20, color=tcol)
+        fig.text(0.03, 0.94, params_text, fontsize=10, family="monospace",
                  verticalalignment="top", color=tcol)
         return fig
 
@@ -536,6 +556,61 @@ class DetailsWindow:
                 params += f"  [reference] full-range LoD/LoQ: {c4['lod_fullrange']:.4g} / {c4['loq_fullrange']:.4g}\n"
         self._add_param_panel(tab, params)
         self.fig4_params = self._create_params_figure("Step 4: Concentration Parameters", params)
+
+    # ---------------- Tab 5: 预设溯源（无条件创建） ----------------
+    STEP_TITLES = {1: "Wavelength Calibration",
+                   2: "SPD Response Calibration",
+                   3: "Sample Spectrum Analysis",
+                   4: "Standard Curve / Concentration"}
+
+    def _provenance_text(self):
+        """把 self.preset_provenance 渲染成纯文本；缺失的步骤也必须显式列出。"""
+        lines = [
+            "[Preset Provenance - where the key parameters of each step came from]",
+            "  Records, for Step 1-4, whether the key parameters were imported from a",
+            "  preset file or produced by the live calibration / fit of this session.",
+            "",
+        ]
+        for step in (1, 2, 3, 4):
+            entry = (self.preset_provenance or {}).get(f"step{step}")
+            lines.append(f"[Step {step}: {self.STEP_TITLES[step]}]")
+            if not isinstance(entry, dict):
+                lines.append("  Source      : Not completed / not imported")
+                lines.append("  This step was neither completed nor imported -> no provenance to show.")
+                lines.append("")
+                continue
+            kind = entry.get("kind")
+            if kind == "preset":
+                source = f"Imported preset ({entry.get('preset_type') or 'UNKNOWN'})"
+            elif kind == "live":
+                source = "Live calibration / fit"
+            else:
+                source = f"Not completed / not imported (kind={kind})"
+            lines.append(f"  Source      : {source}")
+            lines.append(f"  Preset Name : {entry.get('preset_name') or 'n/a'}")
+            lines.append(f"  File Name   : {entry.get('file_name') or 'n/a'}")
+            lines.append(f"  File Path   : {entry.get('file') or 'n/a'}")
+            lines.append(f"  Imported At : {entry.get('imported_at') or 'n/a'}")
+            params = entry.get("params") or {}
+            if params:
+                lines.append("  Key Parameters:")
+                for key in params:
+                    lines.append(f"    - {key}: {params[key]}")
+            else:
+                lines.append("  Key Parameters: (none recorded)")
+            lines.append("")
+        return "\n".join(lines)
+
+    def _build_tab5(self):
+        tab = ttk.Frame(self.notebook)
+        self.notebook.add(tab, text="数据来源 / Provenance")
+        params = self._provenance_text()
+        sc, inner = self._create_scrollable_frame(tab)
+        self.fig5 = self._create_provenance_figure("Preset Provenance (Data Source)", params)
+        self._embed_figure(self.fig5, sc, inner)
+        self._add_param_panel(tab, params,
+                              title="Preset Provenance — 预设来源 / 导入文件 / 关键参数",
+                              height=22)
 
     # ---------------- PDF ----------------
     def export_pdf_report(self, figures):

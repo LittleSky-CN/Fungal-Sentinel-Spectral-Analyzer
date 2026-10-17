@@ -1,7 +1,7 @@
 # Fungal-Sentinel-Spectral-Analyzer
 Open-source, offline-first spectral analysis software for a low-cost portable fungal fluorescence detector. Smartphone DNG + grating spectroscopy → quantitative fluorescence & turbidity. (iGEM 2026)
 
-**FSSA (Fungal Sentinel Spectral Analyzer) — v1.4.6** · Python desktop reference implementation
+**FSSA (Fungal Sentinel Spectral Analyzer) — v1.4.7** · Python desktop reference implementation
 Android counterpart: **MycoSpec v2.2.6** (https://github.com/LittleSky-CN/Mycospec)
 
 All three preset types can be saved and reused across sessions:

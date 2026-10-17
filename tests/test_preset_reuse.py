@@ -172,7 +172,7 @@ def test_spd_params_json_stores_the_wavelength_mapping_and_raw_lamp(tmp_path):
     cal.save_params(str(path))
     payload = json.loads(path.read_text(encoding="utf-8"))
 
-    assert payload["version"] == "1.4.6"
+    assert payload["version"] == "1.4.7"
     assert payload["schema_version"] == 2
     for legacy_key in ("valid_range", "smooth_window", "spd_threshold_ratio",
                        "wavelengths", "response_R", "response_G", "response_B"):
