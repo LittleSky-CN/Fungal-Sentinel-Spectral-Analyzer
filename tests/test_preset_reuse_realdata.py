@@ -265,17 +265,20 @@ def test_step2_calibrates_three_channels(session):
     assert cal.final_mask.sum() > 100
 
 
-def test_spd_preset_round_trip_is_bit_exact(session, tmp_path):
+def test_spd_preset_round_trip_is_numerically_stable(session, tmp_path):
+    """v3：保存 -> 加载后曲线回到同一条（容差断言，不再声称 bit-exact）。"""
     cal = session.calibrator
     path = tmp_path / "spd_calibration_params.json"
     cal.save_params(str(path))
 
     loaded = SpectralResponseCalibrator.load_params(str(path), session.mapping)
 
-    assert np.array_equal(cal.wavelengths, loaded.wavelengths)
-    assert np.array_equal(cal.response_R, loaded.response_R)
-    assert np.array_equal(cal.response_G, loaded.response_G)
-    assert np.array_equal(cal.response_B, loaded.response_B)
+    np.testing.assert_allclose(loaded.wavelengths, cal.wavelengths,
+                               rtol=1e-15, atol=0.0)
+    for channel in ("R", "G", "B"):
+        np.testing.assert_allclose(getattr(loaded, f"response_{channel}"),
+                                   getattr(cal, f"response_{channel}"),
+                                   rtol=1e-15, atol=0.0)
 
 
 def test_reloaded_spd_preset_gives_identical_spectra(session, tmp_path):
@@ -298,38 +301,31 @@ def test_reloaded_spd_preset_gives_identical_spectra(session, tmp_path):
     assert np.array_equal(before_specs[0], after_specs[0])
 
 
-def test_spd_preset_recompute_matches_a_fresh_calibration_after_drift(session, tmp_path):
-    """Mode B on real DNGs: load a preset under a 15 px drifted mapping and it
-    must reproduce a fresh Step 2 run on that same mapping."""
+def test_spd_preset_is_identical_under_a_drifted_mapping(session, tmp_path):
+    """v3 on real DNGs: a preset loaded under a 15 px drifted mapping must return
+    exactly the same curves -- no recompute, no resampling, no drift error."""
     cal = session.calibrator
     path = tmp_path / "spd_drift.json"
     cal.save_params(str(path))
 
     drifted = LinearMapping(session.mapping.slope_k, session.mapping.intercept_b + 15.0)
     loaded = SpectralResponseCalibrator.load_params(str(path), drifted)
-    assert loaded.recomputed is True
-    assert loaded.drift_nm == pytest.approx(15.0 / abs(session.mapping.slope_k), abs=1e-9)
 
+    assert loaded.drift_nm == pytest.approx(15.0 / abs(session.mapping.slope_k), abs=1e-9)
+    assert np.array_equal(loaded.wavelengths, cal.wavelengths)
+    for channel in ("R", "G", "B"):
+        assert np.array_equal(getattr(loaded, f"response_{channel}"),
+                              getattr(cal, f"response_{channel}"))
+
+    # 对照：用漂移后的 mapping 重跑一遍 Step 2，曲线也应该落在同一条网格上，
+    # 只是数值会因灯谱/SPD 对齐位置不同而略有差异（这是物理差异，不是格式问题）。
     fresh = SpectralResponseCalibrator(drifted)
     frame = session.frames["spd"]
     pixels = np.arange(len(frame["red"]), dtype=np.float64)
     measured = np.column_stack((frame["red"], frame["green"], frame["blue"]))
     true_wl, true_val = load_true_spd_data(TRUE_SPD)
     fresh.calibrate(pixels, measured, true_wl, true_val)
-
-    mask = fresh.final_mask
-    assert mask.sum() > 20
-    for channel in ("R", "G", "B"):
-        denominator = np.maximum(np.abs(getattr(fresh, f"response_{channel}")[mask]), 1e-12)
-        deviation = np.abs(getattr(loaded, f"response_{channel}")[mask]
-                           - getattr(fresh, f"response_{channel}")[mask]) / denominator
-        assert float(np.max(deviation)) < 1e-4
-
-    # Mode A on the same file is nowhere near that good -> the fix is what closes it
-    mode_a = SpectralResponseCalibrator.load_params(str(path), drifted, recompute=False)
-    denominator = np.maximum(np.abs(fresh.response_G[mask]), 1e-12)
-    mode_a_deviation = np.abs(mode_a.response_G[mask] - fresh.response_G[mask]) / denominator
-    assert float(np.max(mode_a_deviation)) > 0.1
+    assert np.array_equal(fresh.wavelengths, loaded.wavelengths)
 
 
 @pytest.mark.parametrize("metric_mode", ["unmixing", "legacy"])

@@ -12,14 +12,17 @@ All three are now persisted on the desktop build:
 ``wavelength_calibration.json`` (Step 1), ``spd_calibration_params.json``
 (Step 2) and ``concentration_curve.json`` (Step 4).
 
-The Step 2 preset carries its wavelength mapping plus the raw lamp profiles and
-reference-SPD grid, so a preset loaded under a drifted mapping is *recomputed*
-(Mode B) and is equivalent to re-running Step 2.  Drift itself only ever warns.
+【SPD payload v3】The Step 2 preset is indexed by wavelength (a canonical uniform
+380-780 nm grid), NOT by pixel: the response curves no longer depend on any
+mapping, so loading a preset under a drifted mapping returns byte-identical
+curves.  The mapping is kept in the file for drift diagnostics only, and drift
+itself only ever warns.  ``schema_version != 3`` is refused outright.
 """
 import json
 import math
 
-from core.calibration import APP_VERSION
+from core.calibration import (APP_VERSION, SPD_GRID_START_NM, SPD_GRID_STOP_NM,
+                              SPD_GRID_STEP_NM, SPD_SCHEMA_VERSION, canonical_grid)
 
 import numpy as np
 import pytest
@@ -136,20 +139,34 @@ def _sample_metric_from_preset(preset):
 # ---------------------------------------------------------------------------
 # SPD preset (Step 2)
 # ---------------------------------------------------------------------------
-def test_spd_params_round_trip_is_bit_exact(tmp_path):
-    original = _synthetic_calibrator()
+def test_spd_params_round_trip_is_numerically_stable(tmp_path):
+    """保存 -> 加载后曲线必须回到同一条（容差断言，不再声称 bit-exact）。
+
+    v3 把响应重采样到规范波长网格，保存的是网格值而不是逐像素值，所以
+    "bit-exact" 这个说法对物理量已无意义；这里断言数值稳定即可。
+    """
+    original = _sensor_grid_calibrator()
     path = tmp_path / "spd_calibration_params.json"
     original.save_params(str(path))
 
     loaded = SpectralResponseCalibrator.load_params(str(path), original.mapping)
 
-    assert np.array_equal(original.wavelengths, loaded.wavelengths)
-    assert np.array_equal(original.response_R, loaded.response_R)
-    assert np.array_equal(original.response_G, loaded.response_G)
-    assert np.array_equal(original.response_B, loaded.response_B)
-    assert np.array_equal(original.final_mask, loaded.final_mask)
+    np.testing.assert_allclose(loaded.wavelengths, original.wavelengths,
+                               rtol=1e-15, atol=0.0)
+    for channel in ("R", "G", "B"):
+        np.testing.assert_allclose(getattr(loaded, f"response_{channel}"),
+                                   getattr(original, f"response_{channel}"),
+                                   rtol=1e-15, atol=0.0)
+    assert np.array_equal(loaded.final_mask, original.final_mask)
     assert loaded.valid_range == original.valid_range
     assert loaded.spd_threshold_ratio == original.spd_threshold_ratio
+
+    # 喂进 correct_by_response 后的结果也必须一致
+    signal = np.abs(np.sin(np.linspace(0.0, 6.0, loaded.wavelengths.size))) + 0.01
+    from core.calibration import correct_by_response
+    np.testing.assert_allclose(correct_by_response(signal, loaded.response_G),
+                               correct_by_response(signal, original.response_G),
+                               rtol=1e-12, atol=0.0)
 
 
 def test_spd_params_reuse_reproduces_the_same_correction(tmp_path):
@@ -166,36 +183,48 @@ def test_spd_params_reuse_reproduces_the_same_correction(tmp_path):
     assert np.array_equal(before, after)
 
 
-def test_spd_params_json_stores_the_wavelength_mapping_and_raw_lamp(tmp_path):
-    """DEF-P02 (fixed): the Step 2 JSON now carries the slope/intercept it was
-    computed with -- so the file can be checked against the active mapping -- and
-    it also carries the raw lamp profiles plus the raw reference SPD grid, which
-    lets ``load_params`` recompute the response on the current mapping (Mode B)."""
-    cal = _synthetic_calibrator()
+def test_spd_params_json_carries_the_v3_wavelength_axis(tmp_path):
+    """payload v3：索引轴是规范波长网格，且不含任何像素域载荷。"""
+    cal = _sensor_grid_calibrator()
     path = tmp_path / "spd.json"
     cal.save_params(str(path))
     payload = json.loads(path.read_text(encoding="utf-8"))
 
-    # 跟着 APP_VERSION 走，别硬编码：否则每次升版这条都会假失败
-    assert payload["version"] == APP_VERSION
-    assert payload["schema_version"] == 2
-    for legacy_key in ("valid_range", "smooth_window", "spd_threshold_ratio",
-                       "wavelengths", "response_R", "response_G", "response_B"):
-        assert legacy_key in payload, "legacy key must survive for old files"
+    assert payload["schema_version"] == SPD_SCHEMA_VERSION == 3
+    assert payload["app_version"] == APP_VERSION
+    assert payload["preset_type"] == "SPD"
+    assert isinstance(payload["created_at"], str) and payload["created_at"]
 
+    # 轴：与 canonical_grid() 逐点一致，且与 axis 块自洽
+    assert payload["axis"] == {"kind": "uniform_wavelength",
+                              "start_nm": SPD_GRID_START_NM,
+                              "stop_nm": SPD_GRID_STOP_NM,
+                              "step_nm": SPD_GRID_STEP_NM}
+    np.testing.assert_allclose(payload["wavelengths"], canonical_grid(),
+                               rtol=0.0, atol=1e-9)
+    assert payload["grid_points"] == len(payload["wavelengths"]) == canonical_grid().size
+
+    for key in ("response_r", "response_g", "response_b", "mask"):
+        assert len(payload[key]) == payload["grid_points"], key
+    assert set(payload["mask"]) <= {0, 1}
+    assert payload["masked_count"] == sum(payload["mask"])
+    lo, hi = payload["effective_band"]
+    assert lo >= SPD_GRID_START_NM and hi <= SPD_GRID_STOP_NM
+    assert payload["valid_range"] == list(cal.valid_range)
+    assert payload["spd_threshold_ratio"] == cal.spd_threshold_ratio
+
+    # 诊断信息仍在（但绝不参与重建）
     assert math.isclose(payload["slope"], cal.mapping.slope_k, rel_tol=1e-12)
     assert math.isclose(payload["intercept"], cal.mapping.intercept_b, rel_tol=1e-12)
-    assert payload["sensor_height"] == len(cal.wavelengths)
+    assert payload["sensor_height"] == 3072
     assert payload["rb_swapped"] is False
 
-    # Mode B raw inputs -- 6 significant digits, same length as the response grid
-    assert len(payload["lamp_R"]) == len(payload["wavelengths"])
-    assert len(payload["lamp_G"]) == len(payload["wavelengths"])
-    assert len(payload["lamp_B"]) == len(payload["wavelengths"])
-    assert np.allclose(payload["lamp_G"], cal.lamp_rgb[:, 1], rtol=1e-5, atol=1e-15)
-    reference = payload["spd_reference"]
-    assert len(reference["wavelengths"]) == len(reference["values"]) >= 2
-    assert np.allclose(reference["values"], cal.spd_reference[1], rtol=1e-5, atol=1e-15)
+    # 被删除的键必须真的没了 —— 尤其一切像素域数组
+    for dead in ("version", "response_R", "response_G", "response_B",
+                 "lamp_R", "lamp_G", "lamp_B", "spd_reference", "recomputed"):
+        assert dead not in payload, f"{dead} must not come back"
+    assert not any(key.startswith("lamp_") and key != "lamp_R_n"
+                   for key in payload), "no pixel-domain lamp payload"
 
 
 def test_load_params_accepts_a_missing_mapping_then_breaks_later(tmp_path):
@@ -212,102 +241,62 @@ def test_load_params_accepts_a_missing_mapping_then_breaks_later(tmp_path):
         blind.mapping.pixel_to_wavelength(np.arange(3.0))
 
 
-def test_load_params_drops_the_aligned_source_spectrum(tmp_path):
-    """DEF-P03 (characterisation): ``load_params`` rebuilds ``final_mask`` from
-    the response curves but never restores ``spd_aligned``, so anything reading
-    it after a load sees None."""
-    cal = _synthetic_calibrator()
-    assert cal.spd_aligned is not None
+def test_loaded_spd_response_needs_no_resampling_onto_the_current_mapping(tmp_path):
+    """v3 的核心：preset 自带波长轴，换 mapping 后无需任何重采样，
+    ``load_params`` 返回的曲线与 mapping 无关。"""
+    cal = _sensor_grid_calibrator()
     path = tmp_path / "spd.json"
     cal.save_params(str(path))
 
-    loaded = SpectralResponseCalibrator.load_params(str(path), cal.mapping)
-    assert loaded.spd_aligned is None
-    assert np.array_equal(loaded.final_mask, cal.final_mask)
-
-
-def test_loaded_spd_response_is_resampled_onto_the_current_mapping(tmp_path):
-    """DEF-P04: with a different mapping active the saved response is silently
-    interpolated onto the new wavelength axis instead of being rejected, so a
-    reused SPD preset does not reproduce the original calibration."""
-    from core.calibration import correct_by_response
-    cal = _synthetic_calibrator()
-    path = tmp_path / "spd.json"
-    cal.save_params(str(path))
-
-    drifting = LinearMapping(cal.mapping.slope_k, cal.mapping.intercept_b + 5.0)
+    drifting = LinearMapping(cal.mapping.slope_k, cal.mapping.intercept_b + 15.0)
     loaded = SpectralResponseCalibrator.load_params(str(path), drifting)
 
-    # The saved response is indexed by the ORIGINAL ascending wavelength grid.
-    # gui._interp_response() resamples it onto whatever grid the CURRENT mapping
-    # produces; a drifted mapping therefore shifts the response in wavelength
-    # instead of raising an error.
-    grid = cal.wavelengths
-    shifted = grid + 5.0 / abs(cal.mapping.slope_k)     # 5 px of drift, ≈1.8 nm
-    assert np.array_equal(loaded.wavelengths, grid)
-
-    response_original = np.interp(grid, loaded.wavelengths, loaded.response_G)
-    response_shifted = np.interp(shifted, loaded.wavelengths, loaded.response_G)
-    assert np.array_equal(response_original, response_shifted) is False
-
-
-def test_loaded_spd_response_is_recomputed_on_the_current_mapping(tmp_path):
-    """Mode B: a preset loaded under a drifted mapping must be identical to
-    re-running Step 2 with that mapping -- the baked response carries a
-    ``SPD(λ-δ)/SPD(λ)`` error that no amount of interpolation can remove."""
-    cal = _sensor_grid_calibrator()
-    path = tmp_path / "spd.json"
-    cal.save_params(str(path))
-
-    drifted = LinearMapping(cal.mapping.slope_k, cal.mapping.intercept_b + 15.0)
-    loaded = SpectralResponseCalibrator.load_params(str(path), drifted)
-    fresh = _sensor_grid_calibrator(drifted)
-
-    assert loaded.recomputed is True
-    assert loaded.drift_level == "WARN"
-    assert loaded.drift_nm == pytest.approx(15.0 / abs(cal.mapping.slope_k), abs=1e-9)
-    assert np.allclose(loaded.wavelengths, fresh.wavelengths, rtol=0.0, atol=1e-9)
-    assert np.array_equal(loaded.final_mask, fresh.final_mask)
-    # 6 significant digits on the raw lamp inputs -> ~5e-6 relative worst case
+    # 加载结果与保存时完全一致，也没有任何"重算"痕迹
+    assert np.array_equal(loaded.wavelengths, cal.wavelengths)
     for channel in ("R", "G", "B"):
-        assert np.allclose(getattr(loaded, f"response_{channel}"),
-                           getattr(fresh, f"response_{channel}"), rtol=1e-5, atol=1e-12)
+        assert np.array_equal(getattr(loaded, f"response_{channel}"),
+                              getattr(cal, f"response_{channel}"))
+    assert not hasattr(loaded, "recomputed")
 
 
-def test_mode_a_still_deviates_when_recompute_is_disabled(tmp_path):
-    """The same comparison with Mode B off -- this is the deviation the fix removes."""
+def test_loaded_spd_response_is_identical_under_two_different_mappings(tmp_path):
+    """解耦的核心断言：同一份 v3 preset 在两个相差数 nm 的 mapping 下加载，
+    得到的三条响应曲线必须逐点全等。"""
     cal = _sensor_grid_calibrator()
     path = tmp_path / "spd.json"
     cal.save_params(str(path))
 
+    # 15 px ÷ 2.738911 px/nm ≈ 5.5 nm 漂移，已超过 WARN 阈值
     drifted = LinearMapping(cal.mapping.slope_k, cal.mapping.intercept_b + 15.0)
-    fresh = _sensor_grid_calibrator(drifted)
-    mode_a = SpectralResponseCalibrator.load_params(str(path), drifted, recompute=False)
+    a = SpectralResponseCalibrator.load_params(str(path), cal.mapping)
+    b = SpectralResponseCalibrator.load_params(str(path), drifted)
 
-    assert mode_a.recomputed is False
-    mask = fresh.final_mask
-    assert mask.sum() >= 20
-    denominator = np.maximum(np.abs(fresh.response_G[mask]), 1e-12)
-    deviation = np.abs(mode_a.response_G[mask] - fresh.response_G[mask]) / denominator
-    assert float(np.max(deviation)) > 0.05
+    assert b.drift_nm == pytest.approx(15.0 / abs(cal.mapping.slope_k), abs=1e-9)
+    assert b.drift_level == "WARN"
+    assert np.array_equal(a.wavelengths, b.wavelengths)
+    assert np.array_equal(a.final_mask, b.final_mask)
+    for channel in ("R", "G", "B"):
+        assert np.array_equal(getattr(a, f"response_{channel}"),
+                              getattr(b, f"response_{channel}"))
 
 
-def test_load_params_falls_back_to_mode_a_on_legacy_files(tmp_path):
-    """A preset without ``lamp_*`` must still load (backward compatibility)."""
+def test_load_params_refuses_a_legacy_schema_version(tmp_path):
+    """v3 不做兼容迁移：schema_version != 3 一律拒绝，并给出可操作的错误信息。"""
     cal = _sensor_grid_calibrator()
     path = tmp_path / "spd_legacy.json"
     cal.save_params(str(path))
     payload = json.loads(path.read_text(encoding="utf-8"))
-    for key in ("lamp_R", "lamp_G", "lamp_B", "spd_reference", "slope", "intercept"):
-        payload.pop(key, None)
+    payload["schema_version"] = 2
     path.write_text(json.dumps(payload), encoding="utf-8")
 
-    drifted = LinearMapping(cal.mapping.slope_k, cal.mapping.intercept_b + 15.0)
-    loaded = SpectralResponseCalibrator.load_params(str(path), drifted)
+    with pytest.raises(ValueError, match="schema_version"):
+        SpectralResponseCalibrator.load_params(str(path), cal.mapping)
 
-    assert loaded.recomputed is False
-    assert loaded.drift_level == "UNKNOWN"      # no embedded mapping -> cannot measure
-    assert np.array_equal(loaded.wavelengths, cal.wavelengths)
+    with pytest.raises(ValueError) as excinfo:
+        SpectralResponseCalibrator.load_params(str(path), cal.mapping)
+    message = str(excinfo.value)
+    assert "2" in message and "3" in message
+    assert ("重新导出" in message) or ("重做" in message)
 
 
 def test_drift_level_thresholds():
@@ -328,7 +317,7 @@ def test_load_params_rejects_a_length_mismatch(tmp_path):
     path = tmp_path / "spd.json"
     cal.save_params(str(path))
     payload = json.loads(path.read_text(encoding="utf-8"))
-    payload["response_G"] = payload["response_G"][:-1]
+    payload["response_g"] = payload["response_g"][:-1]
     path.write_text(json.dumps(payload), encoding="utf-8")
 
     with pytest.raises(ValueError, match="does not match its wavelength grid"):
@@ -353,9 +342,9 @@ def test_load_params_rejects_a_degenerate_response(tmp_path):
     path = tmp_path / "spd.json"
     cal.save_params(str(path))
     payload = json.loads(path.read_text(encoding="utf-8"))
-    payload["response_R"] = [0.0] * len(payload["wavelengths"])
-    payload["response_G"] = [0.0] * len(payload["wavelengths"])
-    payload["response_B"] = [0.0] * len(payload["wavelengths"])
+    payload["response_r"] = [0.0] * len(payload["wavelengths"])
+    payload["response_g"] = [0.0] * len(payload["wavelengths"])
+    payload["response_b"] = [0.0] * len(payload["wavelengths"])
     path.write_text(json.dumps(payload), encoding="utf-8")
 
     with pytest.raises(ValueError, match="at least 20 are required"):
@@ -370,9 +359,12 @@ def test_load_params_rejects_a_preset_that_does_not_cover_the_current_axis(tmp_p
     payload = json.loads(path.read_text(encoding="utf-8"))
     keep = (np.asarray(payload["wavelengths"]) >= 500.0) & (
         np.asarray(payload["wavelengths"]) <= 600.0)
-    for key in ("wavelengths", "response_R", "response_G", "response_B",
-                "lamp_R", "lamp_G", "lamp_B"):
+    for key in ("wavelengths", "response_r", "response_g", "response_b", "mask"):
         payload[key] = [v for v, flag in zip(payload[key], keep) if flag]
+    # 轴块必须与裁剪后的网格自洽，否则会先撞 L1 而不是 L2
+    payload["axis"] = {"kind": "uniform_wavelength", "start_nm": 500.0,
+                       "stop_nm": 600.0, "step_nm": 1.0}
+    payload["grid_points"] = len(payload["wavelengths"])
     path.write_text(json.dumps(payload), encoding="utf-8")
 
     with pytest.raises(ValueError, match="当前波长轴未被 preset 覆盖"):

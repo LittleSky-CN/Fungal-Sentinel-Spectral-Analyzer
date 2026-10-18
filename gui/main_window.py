@@ -29,6 +29,7 @@ from core.image_processing import (
 from core.calibration import (
     LinearMapping, TwoPointValidation, SpectralResponseCalibrator,
     analyze_blank_subtracted_replicates, correct_by_response, remove_isolated_spikes,
+    resample_to_grid,
 )
 from core.quantification import calculate_concentration
 from core.curve_preset import load_curve_preset as read_curve_preset, save_curve_preset
@@ -644,12 +645,8 @@ class FSSA_GUI:
                     "frames": preset.get("frames"),
                 })
 
-            # 已加载过 SPD preset 时，用新映射重算响应（Mode B），使两者保持一致
-            if self.spd_params_path and Path(self.spd_params_path).is_file():
-                try:
-                    self._load_spd_params_from(self.spd_params_path, silent=True)
-                except (OSError, TypeError, ValueError, KeyError) as spd_exc:
-                    self.log_status(2, f"SPD recompute skipped: {spd_exc}", "orange")
+            # 【SPD payload v3】preset 自带波长轴，响应曲线与像素映射无关，
+            # 不再需要"换了 mapping 就重算 SPD"的联动。
 
             messagebox.showinfo("Success",
                                 f"Wavelength preset loaded from:\n{file_path}\n"
@@ -671,7 +668,8 @@ class FSSA_GUI:
                 messagebox.showinfo(
                     "Success",
                     f"SPD parameters exported to:\n{file_path}\n"
-                    "含波长映射与原始灯谱，可跨会话按当前映射重算。")
+                    "响应曲线已按 380-780 nm 波长网格保存，与像素/波长映射无关，"
+                    "可在任何会话直接复用。")
             except Exception as e:
                 messagebox.showerror("Error", str(e))
 
@@ -702,24 +700,14 @@ class FSSA_GUI:
             "wavelengths": calibrator.wavelengths,
             "R": calibrator.response_R, "G": calibrator.response_G, "B": calibrator.response_B,
             "spd_threshold_ratio": calibrator.spd_threshold_ratio,
-            "smooth_window": calibrator.smooth_window,
             "loaded_from_file": True,
             # 【补充】占位键：让 details 窗口不报错，但 _build_tab2 的 else 分支会显示提示
             "measured_total": None,
             "corrected_total": None,
             "pos_R": None, "pos_G": None, "pos_B": None,
-            # 【v1.4.6】Mode B 重算需要的原始输入
-            "lamp_R": calibrator.lamp_rgb[:, 0] if calibrator.lamp_rgb is not None else None,
-            "lamp_G": calibrator.lamp_rgb[:, 1] if calibrator.lamp_rgb is not None else None,
-            "lamp_B": calibrator.lamp_rgb[:, 2] if calibrator.lamp_rgb is not None else None,
-            "spd_aligned": calibrator.spd_aligned,
             "final_mask": calibrator.final_mask,
-            "recomputed": calibrator.recomputed,
         }
-        status = f"Loaded from {Path(file_path).name}"
-        if calibrator.recomputed:
-            status += " | Mode B recomputed"
-        self.log_status(2, status, "green")
+        self.log_status(2, f"Loaded from {Path(file_path).name}", "green")
         if not self._report_spd_drift(calibrator):     # SEVERE 且用户取消 -> 回滚
             self.calibrator = previous
             self.spd_params_path = None
@@ -755,7 +743,8 @@ class FSSA_GUI:
                 "drift_nm": getattr(calibrator, "drift_nm", None),
                 "drift_level": getattr(calibrator, "drift_level", "UNKNOWN"),
                 "spd_source": getattr(calibrator, "spd_source", None),
-                "recomputed": bool(getattr(calibrator, "recomputed", False)),
+                "grid_points": getattr(calibrator, "grid_points", None),
+                "effective_band": getattr(calibrator, "effective_band", None),
                 "x_roi": getattr(calibrator, "x_roi", None),
                 "g_error_nm": getattr(calibrator, "g_error_nm", None),
             })
@@ -1066,20 +1055,33 @@ class FSSA_GUI:
             self.calibrator.x_roi = tuple(int(v) for v in self.x_roi) if self.x_roi else None
             self.calibrator.g_error_nm = self.cache_step1.get("wl_err")
             self.calibrator.rb_swapped = bool(self.cache_step1.get("rb_swapped", False))
+            try:
+                self.calibrator.exposure_seconds = float(
+                    np.mean([get_exposure_time(f) for f in spd_files]))
+            except Exception:
+                self.calibrator.exposure_seconds = None
+            self.calibrator.frames = len(spd_files)
 
             wl_order_check = self.mapping.pixel_to_wavelength(y_pixels)
-            lamp_aligned = measured_rgb[::-1, :] if wl_order_check[0] > wl_order_check[-1] else measured_rgb
+            descending = wl_order_check[0] > wl_order_check[-1]
+            # 【SPD payload v3】响应轴已是规范波长网格，独立验证数据必须重采样到同一轴，
+            # 否则 details_window 的 len(pos_R) == len(wls) 会不成立、Figure 4a/4b 退化成占位。
+            wl_asc = wl_order_check[::-1] if descending else wl_order_check
             # 【v1.4.4-fix】独立验证数据：定位光源剖面（Step 1 缓存），按波长对齐
             pos_R = pos_G = pos_B = None
             pos_profiles = self.cache_step1.get("profiles")
             if pos_profiles is not None:
                 pos_rgb = np.column_stack((pos_profiles["red"], pos_profiles["green"], pos_profiles["blue"]))
                 if pos_rgb.shape[0] == measured_rgb.shape[0]:
-                    pos_aligned = pos_rgb[::-1, :] if wl_order_check[0] > wl_order_check[-1] else pos_rgb
-                    pos_R, pos_G, pos_B = pos_aligned[:, 0], pos_aligned[:, 1], pos_aligned[:, 2]
+                    pos_aligned = pos_rgb[::-1, :] if descending else pos_rgb
+                    pos_R = resample_to_grid(wl_asc, pos_aligned[:, 0])
+                    pos_G = resample_to_grid(wl_asc, pos_aligned[:, 1])
+                    pos_B = resample_to_grid(wl_asc, pos_aligned[:, 2])
 
             # 【关键修复】计算 measured_total 和 corrected_total，供 Details Tab 2 第二张子图使用
-            measured_total = np.sum(measured_rgb, axis=1)
+            # 【SPD payload v3】响应轴已是规范波长网格，分子必须重采样到同一轴
+            measured_total = resample_to_grid(wl_asc, np.sum(measured_rgb, axis=1)[::-1]
+                                              if descending else np.sum(measured_rgb, axis=1))
             resp_sum = self.calibrator.response_R + self.calibrator.response_G + self.calibrator.response_B
             resp_sum = np.where(resp_sum > 1e-6, resp_sum, 1e-6)
             corrected_total = measured_total / resp_sum
@@ -1089,13 +1091,9 @@ class FSSA_GUI:
             self.cache_step2 = {
                 "wavelengths": self.calibrator.wavelengths,
                 "R": self.calibrator.response_R, "G": self.calibrator.response_G, "B": self.calibrator.response_B,
-                "lamp_R": lamp_aligned[:, 0], "lamp_G": lamp_aligned[:, 1], "lamp_B": lamp_aligned[:, 2],
                 "lamp_R_n": len(spd_files),
-                "spd_aligned": self.calibrator.spd_aligned,
-                "spd_reference": self.calibrator.spd_reference,
                 "final_mask": self.calibrator.final_mask,
                 "spd_threshold_ratio": self.calibrator.spd_threshold_ratio,
-                "smooth_window": self.calibrator.smooth_window,
                 "loaded_from_file": False,
                 "measured_total": measured_total,
                 "corrected_total": corrected_total,
@@ -1129,19 +1127,15 @@ class FSSA_GUI:
             margin = (wp[-1] - wp[0]) * 0.05
             self.ax.set_xlim(wp[0] - margin, wp[-1] + margin)
             self.ax.legend(); self._style_fig(self.fig); self.fig.tight_layout(); self.canvas_plot.draw()
-            try:
-                exp_step2 = float(np.mean([get_exposure_time(f) for f in spd_files]))
-            except Exception:
-                exp_step2 = None
             self._record_provenance(
                 2, "live",
                 params={
                     "frames": len(spd_files),
-                    "exposure": exp_step2,
+                    "exposure": self.calibrator.exposure_seconds,
                     "x_roi": self.x_roi,
                     "spd_csv": Path(self.csv_file).name if self.csv_file else None,
                     "spd_threshold_ratio": self.calibrator.spd_threshold_ratio,
-                    "smooth_window": self.calibrator.smooth_window,
+                    "grid_points": getattr(self.calibrator, "grid_points", None),
                 })
         except Exception as e: self.log_status(2, f"Error: {e}", "red"); messagebox.showerror("Error", str(e))
 

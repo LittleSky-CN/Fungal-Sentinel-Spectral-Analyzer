@@ -456,6 +456,49 @@ def test_step2_live_records_a_live_provenance(gui, monkeypatch):
     assert "x_roi" in entry["params"]
 
 
+def test_step2_cache_is_entirely_on_the_wavelength_grid(gui, monkeypatch):
+    """【SPD payload v3】cache_step2 里所有曲线都必须落在同一条规范波长网格上。
+
+    定位光剖面（pos_*）原本是逐像素的；不重采样的话 details_window 的
+    ``len(pos_R) == len(wls)`` 会不成立，Figure 4a/4b 会静默退化成占位文本。
+    """
+    from core.calibration import canonical_grid
+    pixels = np.arange(3072, dtype=np.float64)
+    lamp = np.column_stack([
+        40.0 * np.exp(-0.5 * ((pixels - 1493.0) / 120.0) ** 2),
+        70.0 * np.exp(-0.5 * ((pixels - 1767.0) / 120.0) ** 2),
+        95.0 * np.exp(-0.5 * ((pixels - 1931.0) / 120.0) ** 2),
+    ])
+    gui.spd_selector = _ns(get_files=lambda: ["spd1.dng"])
+    gui.csv_file = "true_spd.csv"
+    gui.cache_step1["profiles"] = {"red": lamp[:, 0], "green": lamp[:, 1],
+                                   "blue": lamp[:, 2]}
+    monkeypatch.setattr(mw, "get_average_profiles",
+                        lambda paths, x_roi: {"red": lamp[:, 0],
+                                              "green": lamp[:, 1],
+                                              "blue": lamp[:, 2]})
+    monkeypatch.setattr(mw, "apply_rb_swap", lambda profiles, swapped: profiles)
+    monkeypatch.setattr(mw, "load_true_spd_data",
+                        lambda path: (np.linspace(380.0, 720.0, 341),
+                                      np.exp(-0.5 * ((np.linspace(380.0, 720.0, 341)
+                                                      - 540.0) / 70.0) ** 2) + 0.05))
+    monkeypatch.setattr(mw, "get_exposure_time", lambda path: 0.5)
+
+    gui.step2_calibrate()
+
+    grid_size = canonical_grid().size
+    cache = gui.cache_step2
+    np.testing.assert_allclose(cache["wavelengths"], canonical_grid(),
+                               rtol=0.0, atol=1e-9)
+    for key in ("R", "G", "B", "pos_R", "pos_G", "pos_B", "measured_total",
+                "corrected_total", "final_mask"):
+        assert len(cache[key]) == grid_size, f"{key} 不在波长网格上"
+    # 随 Mode B 一起消失的键
+    for dead in ("lamp_R", "lamp_G", "lamp_B", "spd_aligned", "spd_reference",
+                 "recomputed"):
+        assert dead not in cache, f"{dead} 不该再出现在 cache_step2"
+
+
 def test_step2_preset_records_the_spd_preset(gui, tmp_path):
     path = _write_spd_preset(tmp_path)
 

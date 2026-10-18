@@ -205,7 +205,7 @@ def test_load_spd_params_keeps_the_old_calibrator_when_the_file_is_broken(tmp_pa
     path = tmp_path / "spd.json"
     good.save_params(str(path))
     payload = json.loads(path.read_text(encoding="utf-8"))
-    payload["response_G"] = payload["response_G"][:-1]       # L1 length mismatch
+    payload["response_g"] = payload["response_g"][:-1]       # L1 length mismatch
     path.write_text(json.dumps(payload), encoding="utf-8")
 
     gui = _make_gui()
@@ -271,6 +271,36 @@ def test_load_spd_params_rolls_back_when_the_user_rejects_a_severe_drift(tmp_pat
     assert any("严重" in title or "severe" in title.lower()
                for title, _ in gui.messages.warnings), gui.messages.warnings
     assert gui.calibrator is good, "a cancelled load must roll back"
+
+
+def test_loading_a_wavelength_preset_leaves_the_spd_calibrator_alone(
+        tmp_path, monkeypatch):
+    """【SPD payload v3】preset 自带波长轴，换 mapping 不再触发任何 SPD 重载/重算。
+
+    v1.4.6 在这里会用新 mapping 重跑一次 Mode B；那条联动删掉后，
+    导入 WAVELENGTH preset 必须完全不碰 Step 2 的状态。
+    """
+    gui = _make_gui()
+    sentinel = _sensor_grid_calibrator()
+    spd_path = tmp_path / "spd.json"
+    sentinel.save_params(str(spd_path))          # 联动若还在，这里会被真的重载
+    gui.calibrator = sentinel
+    gui.spd_params_path = str(spd_path)
+    gui.cache_step2 = {"loaded_from_file": True}
+
+    wl_path = tmp_path / "wavelength.json"
+    wl_path.write_text("{}", encoding="utf-8")
+    mw.filedialog.askopenfilename = lambda **kwargs: str(wl_path)
+    monkeypatch.setattr(mw, "read_wavelength_preset",
+                        lambda path, mode: {"name": "wl"})
+    monkeypatch.setattr(mw, "mapping_from_preset",
+                        lambda preset: LinearMapping(-2.738911, 3198.4744 + 15.0))
+
+    gui.load_wavelength_preset()
+
+    assert gui.calibrator is sentinel, "换 mapping 不该替换 SPD 标定器"
+    assert gui.cache_step2 == {"loaded_from_file": True}, "Step 2 缓存不该被改写"
+    assert gui.mapping.intercept_b == 3198.4744 + 15.0
 
 
 # ---------------------------------------------------------------------------
