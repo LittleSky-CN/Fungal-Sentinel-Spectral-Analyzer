@@ -17,7 +17,10 @@ from matplotlib.figure import Figure
 from matplotlib.patches import Rectangle
 from matplotlib.backends.backend_pdf import PdfPages
 
-from core.image_processing import normalize_for_display
+from core.image_processing import (
+    normalize_for_display, QUALITY_PASS_NM, QUALITY_WARNING_NM,
+)
+from core.wavelength_preset import step1_quality_tier
 
 try:
     from core.fusion import channel_weights, auto_handoffs, fuse_pointwise
@@ -301,7 +304,19 @@ class DetailsWindow:
         self.fig1.tight_layout()
         self._embed_figure(self.fig1, sc, inner)
 
+        quality = self.cache1.get("quality")
+        tier = step1_quality_tier(quality)
+        # 这一段会渲染进报告 PDF 的参数图（等宽字体缺中文字形），所以只用英文
+        verdict = {
+            "PASS": "usable",
+            "WARNING": "biased - review downstream quantification",
+            "FAILED": "unreliable - redo Step 1",
+        }[tier]
         params = (
+            f"[Calibration Quality] {tier}   <- {verdict}\n"
+            f"  G-point error {v.wavelength_error_nm:+.3f} nm | thresholds: "
+            f"PASS <= {QUALITY_PASS_NM} nm, WARNING <= {QUALITY_WARNING_NM} nm, else FAILED\n"
+            f"  Source tag: {quality if quality else 'unknown'}\n\n"
             f"[Wavelength Mapping Equation]\n"
             f"  Pixel (p) = {v.slope_k:.6f} * Wavelength(λ) + {v.intercept_b:.4f}\n\n"
             f"[Calibration Metadata]\n"

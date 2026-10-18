@@ -21,6 +21,8 @@ import importlib.util
 import sys
 import types
 
+import pytest
+
 
 # ---------------------------------------------------------------------------
 # Tk 桩（同 tests/test_report_provenance.py:18-74）
@@ -178,7 +180,7 @@ PROVENANCE = {
 }
 
 
-def _window(monkeypatch=None):
+def _window(monkeypatch=None, cache1=None):
     """构造一个四步齐全的 DetailsWindow，并顺带抓下每个 tab 的参数文本。"""
     captured = []
     original = dw.DetailsWindow._add_param_panel
@@ -189,8 +191,8 @@ def _window(monkeypatch=None):
 
     dw.DetailsWindow._add_param_panel = spy
     try:
-        win = dw.DetailsWindow(Stub(), _cache1(), _cache2(), _cache3(), _cache4(),
-                               None, preset_provenance=PROVENANCE)
+        win = dw.DetailsWindow(Stub(), cache1 or _cache1(), _cache2(), _cache3(),
+                               _cache4(), None, preset_provenance=PROVENANCE)
     finally:
         dw.DetailsWindow._add_param_panel = original
     win._captured_params = captured
@@ -218,6 +220,47 @@ def test_every_tab_has_a_params_figure():
     for name in ("fig1_params", "fig2_params", "fig3_params", "fig4_params", "fig5"):
         fig = getattr(win, name)
         assert isinstance(fig, Figure), f"{name} 缺失：该 tab 的参数不会进 PDF"
+
+
+@pytest.mark.parametrize("quality,tier,verdict", [
+    ("PASS", "PASS", "usable"),
+    ("GOOD", "PASS", "usable"),
+    ("WARNING", "WARNING", "biased - review downstream quantification"),
+    ("SUSPECT", "WARNING", "biased - review downstream quantification"),
+    ("FAILED", "FAILED", "unreliable - redo Step 1"),
+])
+def test_step1_params_state_the_calibration_quality(quality, tier, verdict):
+    """Step 1 的标定质量必须能在报告里一眼看到，而不是只埋在 G-point Error 那行里。
+
+    这里同时钉住两端的词汇映射（实时 PASS/WARNING/FAILED 与 preset GOOD/SUSPECT），
+    以及那一句人话结论 —— 只显示 PASS/WARNING 三个字母对看报告的人不够。
+    """
+    cache1 = dict(_cache1())
+    cache1["quality"] = quality
+
+    win = _window(cache1=cache1)
+    panel = win._captured_params[0]
+    header = panel.splitlines()[0]
+
+    assert "[Calibration Quality]" in panel, "报告里看不到 Step 1 的质量评级"
+    assert header.startswith(f"[Calibration Quality] {tier}"), header
+    assert verdict in header, f"{tier} 必须带人话结论，光一个 {tier} 不够醒目"
+    # 阈值也得给出来，否则读者没法自己判断
+    assert "2.5" in panel and "10.0" in panel
+    # 参数面板与 PDF 用的 fig 同源，改了内容不能只改一边
+    assert isinstance(win.fig1_params, Figure)
+
+
+def test_step1_params_flags_an_unknown_quality_tag_as_warning():
+    """缺失/未知的质量标签不许在报告里显示成 PASS。"""
+    cache1 = dict(_cache1())
+    cache1.pop("quality", None)
+
+    panel = _window(cache1=cache1)._captured_params[0]
+
+    first_line = panel.splitlines()[0]
+    assert first_line.startswith("[Calibration Quality] WARNING"), first_line
+    assert "Source tag: unknown" in panel
 
 
 def test_param_figures_carry_exactly_the_panel_text():

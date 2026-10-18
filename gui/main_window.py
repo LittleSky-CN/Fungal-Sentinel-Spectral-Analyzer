@@ -24,7 +24,8 @@ from core.image_processing import (
     get_exposure_time, read_dng_linear_rgb, read_dng_frame, auto_detect_x_roi,
     get_average_profiles, calibrate_wavelength, apply_rb_swap,
     parse_known_wavelengths, find_peak_auto, make_channel_profiles,
-    load_true_spd_data, np_trapz
+    load_true_spd_data, np_trapz,
+    QUALITY_PASS_NM, QUALITY_WARNING_NM,
 )
 from core.calibration import (
     LinearMapping, TwoPointValidation, SpectralResponseCalibrator,
@@ -36,7 +37,7 @@ from core.curve_preset import load_curve_preset as read_curve_preset, save_curve
 from core.wavelength_preset import (
     load_wavelength_preset as read_wavelength_preset,
     save_wavelength_preset as write_wavelength_preset,
-    mapping_drift_nm, mapping_from_preset,
+    mapping_drift_nm, mapping_from_preset, step1_quality_tier,
 )
 from core.unmixing import (unmix_spectrum, select_reference_emission,
                            default_unmix_window, slope_t_statistic)
@@ -57,6 +58,47 @@ try:
 except Exception:
     _theme = None
 _THEME_ON = bool(THEME_ENABLED and _theme is not None)
+
+
+# ---------------------------------------------------------------------------
+# Step 1 标定质量 -> 状态行文案与颜色
+#
+# 背景：Step 1 的结果有可能是 WARNING 甚至 FAILED（|G 点残差| 超过 2.5 / 10 nm，
+# 见 core.image_processing.QUALITY_PASS_NM / QUALITY_WARNING_NM），但状态行以前是
+# 无条件绿色的 "Done!"，用户会误以为数据可信。现在非 PASS 一律不许看起来像成功。
+#
+# FAILED 时仍会设置 self.mapping：core.calibrate_wavelength 故意返回尽力而为的
+# 结果（FAILED 还会试另一种 R/B 交换态取误差更小者），Android
+# WavelengthCalibrator.kt 也是同样策略、只染红徽章不阻断流程。所以这里不硬阻断，
+# 只把颜色和弹窗拉满，让用户知道下游定量会受影响。
+# ---------------------------------------------------------------------------
+def _step1_live_status(quality, exp_first, wl_err):
+    """实时标定：返回 ``(文案, 颜色)``。"""
+    tier = step1_quality_tier(quality)
+    exposure = f"Exp: {exp_first:.4f}s" if exp_first is not None else "Exp: n/a"
+    if tier == "PASS":
+        return (f"Done! {exposure} | G-err: {wl_err:+.2f} nm (PASS)", "green")
+    if tier == "WARNING":
+        return (f"Completed with WARNING — {exposure} | G-err {wl_err:+.2f} nm "
+                f"exceeds {QUALITY_PASS_NM} nm; mapping may be biased.", "orange")
+    return (f"FAILED — {exposure} | G-err {wl_err:+.2f} nm exceeds "
+            f"{QUALITY_WARNING_NM} nm; mapping unreliable", "red")
+
+
+def _step1_preset_status(file_name, quality, g_error):
+    """导入 WAVELENGTH preset：返回 ``(文案, 颜色)``。"""
+    tier = step1_quality_tier(quality)
+    label = quality if isinstance(quality, str) and quality else "unknown"
+    detail = f"Loaded from {file_name}"
+    if g_error is not None:
+        detail += f" | G-err {g_error:+.2f} nm"
+    if tier == "PASS":
+        return (f"{detail} [quality: {label}]", "green")
+    if tier == "WARNING":
+        return (f"Loaded with WARNING — {detail} [quality: {label}]; "
+                "波长映射偏差偏大，下游定量需谨慎。", "orange")
+    return (f"Loaded — FAILED quality: {detail} [quality: {label}]; "
+            "mapping unreliable, 下游定量不可信，建议重新标定 Step 1。", "red")
 
 
 class FSSA_GUI:
@@ -621,12 +663,13 @@ class FSSA_GUI:
             if preset.get("roiStart") is not None and preset.get("roiEnd") is not None:
                 self.x_roi = (int(preset["roiStart"]), int(preset["roiEnd"]))
             g_error = preset.get("gErrorNm")
-            status = f"Loaded from {Path(file_path).name}"
-            if g_error is not None:
-                status += f" | G-err {g_error:+.2f} nm"
-            self.log_status(1, status, "green")
+            quality = preset.get("quality")
+            tier = step1_quality_tier(quality)
+            self.log_status(1, *_step1_preset_status(
+                Path(file_path).name, quality, g_error))
             self.cache_step1 = dict(self.cache_step1 or {})
-            self.cache_step1.update({"mapping": self.mapping, "preset": preset})
+            self.cache_step1.update({"mapping": self.mapping, "preset": preset,
+                                     "quality": quality, "wl_err": g_error})
             self._record_provenance(
                 1, "preset", preset_type="WAVELENGTH", file_path=file_path,
                 preset_name=preset.get("name") or Path(file_path).stem,
@@ -648,9 +691,24 @@ class FSSA_GUI:
             # 【SPD payload v3】preset 自带波长轴，响应曲线与像素映射无关，
             # 不再需要"换了 mapping 就重算 SPD"的联动。
 
-            messagebox.showinfo("Success",
-                                f"Wavelength preset loaded from:\n{file_path}\n"
-                                "Step 2 / Step 3 now use the restored mapping.")
+            err_text = f"{g_error:+.2f} nm" if g_error is not None else "未知"
+            detail = (f"Wavelength preset loaded from:\n{file_path}\n"
+                      "Step 2 / Step 3 now use the restored mapping.")
+            if tier == "PASS":
+                messagebox.showinfo("Success", detail)
+            elif tier == "WARNING":
+                messagebox.showwarning(
+                    "波长标定质量存疑 (WARNING)",
+                    f"这份 preset 自带的质量标签是 {quality}，G 点残差 "
+                    f"{err_text}，已超过 {QUALITY_PASS_NM} nm 阈值。\n\n{detail}\n\n"
+                    "映射偏差偏大，Step 3/4 的定量结果请谨慎使用。")
+            else:
+                messagebox.showwarning(
+                    "波长标定质量不合格 (FAILED)",
+                    f"这份 preset 自带的质量标签是 {quality}，G 点残差 "
+                    f"{err_text}，已超过 {QUALITY_WARNING_NM} nm 阈值。\n\n{detail}\n\n"
+                    "映射不可靠，Step 3/4 的定量结果不可信，"
+                    "建议重新拍摄定位图并重做 Step 1。")
         except (OSError, TypeError, ValueError, KeyError) as e:
             messagebox.showerror("Error", f"Could not load wavelength preset:\n{e}")
 
@@ -991,7 +1049,16 @@ class FSSA_GUI:
             self.rb_swapped = rb_swapped
             avg_profiles = apply_rb_swap(avg_profiles, rb_swapped)
             validation = TwoPointValidation(("B", "R"), "G", k, b, pred_y, hold.y_centroid, res_px, wl_err)
-            self.log_status(1, f"Done! Exp: {exp_first:.4f}s | G-err: {wl_err:+.2f} nm", "green")
+            self.log_status(1, *_step1_live_status(fit["quality"], exp_first, wl_err))
+            if step1_quality_tier(fit["quality"]) == "FAILED":
+                # 不硬阻断（见 calibrate_wavelength 的策略），但必须让用户知道
+                messagebox.showwarning(
+                    "波长标定质量不合格 (FAILED)",
+                    f"G 点校验残差 {wl_err:+.2f} nm，已超过 {QUALITY_WARNING_NM} nm 阈值。\n\n"
+                    "映射已按尽力而为的结果设置，但不可靠：\n"
+                    "  · Step 2 的响应曲线会整体偏移；\n"
+                    "  · Step 3/4 的定量结果不可信。\n\n"
+                    "建议重新拍摄定位图并重做 Step 1（检查灯位、曝光与 ROI）。")
             log_text = (f"\n=== Step 1: Wavelength Calibration ===\n"
                         f"Exposure Time Normalized: {exp_first:.4f}s\n"
                         f"CFA: {frame['cfa']} | R/B swapped: {rb_swapped}\n"
@@ -1005,7 +1072,8 @@ class FSSA_GUI:
                                 "sensor_size": (int(rgb_first.shape[1]), int(rgb_first.shape[0])),
                                 "known_wls": {name: knowns[name].wavelength_nm
                                               for name in ("R", "G", "B")},
-                                "rb_swapped": rb_swapped, "cfa": frame["cfa"]}
+                                "rb_swapped": rb_swapped, "cfa": frame["cfa"],
+                                "quality": fit["quality"]}
             self.ax.clear()
             colors = {"red": "red", "green": "green", "blue": "blue"}
             cc = self._centroid_color()
