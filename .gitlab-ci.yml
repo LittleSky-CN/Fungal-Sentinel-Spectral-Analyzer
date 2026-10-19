@@ -1,0 +1,28 @@
+# Fungal Sentinel Spectral Analyzer (FSSA) — CI
+#
+# Purpose: this file EXISTS so that GitLab Auto DevOps does not run.
+# The iGEM GitLab runner has no Docker daemon, so Auto DevOps' Auto Build
+# (Cloud Native Buildpacks) and Auto Code Quality can never succeed there —
+# they failed on the very first push. Providing our own pipeline keeps the
+# repository free of a permanently-red pipeline badge.
+#
+# What this pipeline actually verifies (nothing more, nothing faked):
+#   1. the pinned dependency set in requirements.txt installs cleanly;
+#   2. every source file compiles;
+#   3. the computational core imports without the GUI (tkinter) present.
+#
+# The GUI itself (gui/main_window.py) needs a display and is NOT exercised
+# here — see README.md for how to run it locally.
+
+stages:
+  - verify
+
+core-smoke-test:
+  stage: verify
+  image: python:3.13
+  script:
+    - python -V
+    - python -m pip install --no-cache-dir --upgrade pip
+    - python -m pip install --no-cache-dir -r requirements.txt
+    - python -m compileall -q core gui main.py config.py
+    - python -c "import config, core; from core.calibration import LinearMapping; from core.unmixing import unmix_spectrum; print('FSSA core imports OK')"
