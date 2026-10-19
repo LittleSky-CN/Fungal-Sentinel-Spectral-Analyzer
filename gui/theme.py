@@ -110,7 +110,7 @@ def apply_theme(root, pixel_ttf=None, pixel_family=None):
                     borderwidth=0, arrowcolor=CREAM)
     style.configure("Horizontal.TSeparator", background=CYAN)
 
-    # 【新增】tk 窗口本体不跟随 ttk 样式，必须显式设置背景
+    # [new] plain tk windows do not follow ttk styles, so their background must be set explicitly
     try:
         root.configure(background=BLACK)
     except tk.TclError:
@@ -118,7 +118,7 @@ def apply_theme(root, pixel_ttf=None, pixel_family=None):
     return style
 
 def tint(window, color=None):
-    """【新增】给 tk.Toplevel / tk.Tk 窗口上底色（主题关闭时调用也无害）。"""
+    """[new] Apply the base background to tk.Toplevel / tk.Tk windows (harmless when the theme is off)."""
     try:
         window.configure(background=color or BLACK)
     except Exception:
@@ -143,7 +143,7 @@ def style_figure(fig, grid=True):
             ax.grid(color=MPL["grid"], linestyle=":", alpha=0.9)
         leg = ax.get_legend()
         if leg is not None:
-            # 【修复】Legend 没有 set_facecolor；必须操作其 frame 补丁
+            # [fix] Legend has no set_facecolor; its frame patch must be modified instead
             frame = leg.get_frame()
             frame.set_facecolor(BLACK)
             frame.set_edgecolor(GREEN)

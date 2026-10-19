@@ -6,7 +6,7 @@ import tifffile as tiff
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 
-# 【新增】导入类型定义以消除 Pylance 警告
+# [new] import the type definitions to silence Pylance warnings
 from .calibration import KnownWavelength, PeakResult
 from config import DEFAULT_PARAMS
 
@@ -178,7 +178,7 @@ def demosaic_bayer(samples: np.ndarray, black_level: float, exposure: float,
     red = _demosaic_channel(values, cfa_map, 0)
     green = _demosaic_channel(values, cfa_map, 1)
     blue = _demosaic_channel(values, cfa_map, 2)
-    # 【Android 对齐】顺序敏感：先扣 g，再用**已校正的 g** 去扣 r
+    # [Android alignment] order matters: subtract g first, then subtract r using the **already corrected** g
     green = np.maximum(green - CROSSTALK_G_FROM_R * red, 0.0)
     red = np.maximum(red - CROSSTALK_R_FROM_G * green, 0.0)
     return np.stack((red, green, blue), axis=-1).astype(np.float32)
@@ -431,11 +431,11 @@ class PeakResult:
     lo: int
     hi: int
     peak_height: float
-    # 【v1.4.5 新增，带默认值，旧调用不受影响】
+    # [added in v1.4.5, with a default value, so existing call sites are unaffected]
     estimator: str = "gauss"          # "gauss" | "edges"
     n_maxima: int = 1
     quality: str = "good"             # "good" | "suspect"
-    centroid_legacy: float = 0.0      # 旧质心，仅诊断用
+    centroid_legacy: float = 0.0      # legacy centroid, diagnostic only
 
 
 def find_peak_auto(profile: np.ndarray, known) -> PeakResult:
@@ -450,31 +450,31 @@ def find_peak_auto(profile: np.ndarray, known) -> PeakResult:
         raise RuntimeError(f"No positive peak for {known.name}")
     half = 0.5 * peak_height
 
-    # 1) 半高边（峰核边界）
+    # 1) half-maximum edges (boundaries of the peak core)
     left, right = y_max, y_max
     while left > valid_lo and corrected[left] > half: left -= 1
     while right < valid_hi - 1 and corrected[right] > half: right += 1
     fwhm_lo, fwhm_hi = left, right
     fw = max(1, fwhm_hi - fwhm_lo)
 
-    # 2) 【改进】谷界窗口：向外走到"重新上升"处即停，上限 1.5*FWHM+10
+    # 2) [improved] valley-boundary window: walk outwards and stop where the profile "starts rising again", capped at 1.5*FWHM+10
     def valley_bound(start, step):
         i, limit = start, start + step * int(1.5 * fw + 10)
         while valid_lo < i < valid_hi - 1 and i != limit:
-            if corrected[i + step] >= corrected[i]:   # 剖面开始回升 => i 是谷
+            if corrected[i + step] >= corrected[i]:   # the profile starts rising again => i is a valley
                 break
             i += step
         return i
     lo = max(valid_lo, valley_bound(fwhm_lo, -1))
     hi = min(valid_hi, valley_bound(fwhm_hi, +1) + 1)
 
-    # 3) 单峰性检查（窗内 >20% 峰高的局部极大个数）
+    # 3) unimodality check (number of local maxima above 20% of peak height inside the window)
     win = corrected[lo:hi]
     thr = 0.2 * peak_height
     n_max = sum(1 for i in range(1, len(win) - 1)
                 if win[i] >= thr and win[i] >= win[i - 1] and win[i] > win[i + 1])
 
-    # 4) 估计量：半高区 log-抛物线(高斯)顶点；失败/出界则用半高边中点
+    # 4) estimator: log-parabola (Gaussian) vertex over the half-maximum region; falls back to the half-maximum edge midpoint on failure or out-of-range
     g = np.arange(fwhm_lo, fwhm_hi + 1, dtype=np.float64)
     v = np.clip(corrected[fwhm_lo:fwhm_hi + 1], 1e-9, None)
     gauss_c = edge_c = 0.5 * (fwhm_lo + fwhm_hi)
@@ -487,7 +487,7 @@ def find_peak_auto(profile: np.ndarray, known) -> PeakResult:
                 gauss_c, estimator = cand, "gauss"
     y_center = gauss_c if estimator == "gauss" else edge_c
 
-    # 5) 一致性校验 + 旧质心(诊断)
+    # 5) consistency check + legacy centroid (diagnostic)
     ys = np.arange(lo, hi, dtype=np.float64)
     w = np.clip(profile[lo:hi] - baseline, 0, None)
     centroid_legacy = float((ys * w).sum() / w.sum()) if w.sum() > 0 else float(y_max)

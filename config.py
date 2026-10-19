@@ -1,35 +1,35 @@
 # config.py
 """FSSA v1.5.0 Global Configuration.
 
-【v1.5.0】新增 Fluorescein (sodium salt) 荧光素选项（发射 520 nm / 激发 494 nm /
-green 通道 / FWHM 25）；荧光素标识统一为 canonical ID（FLUOROPHORES 字典键改为
-YPET/EGFP/FLUORESCEIN/MCHERRY/CFP/MTURQUOISE2，新增 canonical_fluorophore()
-归一化解析），以便与 Android 端曲线预设互通。
+[v1.5.0] Added the Fluorescein (sodium salt) fluorophore option (emission 520 nm /
+excitation 494 nm / green channel / FWHM 25); fluorophore identifiers are unified as
+canonical IDs (the FLUOROPHORES dict keys are now YPET/EGFP/FLUORESCEIN/MCHERRY/CFP/MTURQUOISE2,
+and canonical_fluorophore() normalises them) so curve presets interoperate with the Android app.
 """
 
 # =============================================================================
-# 荧光蛋白/目标物数据库 (Fluorophore Database)
+# Fluorophore / target database
 # =============================================================================
-# key 是 canonical ID（与 Android MycoSpec 的 enum name 一致），display_name 是
-# Python 端显示给用户、且写进存量 preset 的历史写法。preset JSON 一律存 canonical。
+# key is the canonical ID (identical to the Android MycoSpec enum name); display_name is the
+# legacy wording shown to the user by the Python side and written into existing presets. Preset JSON always stores canonical.
 FLUOROPHORES = {
     "YPET":         {"display_name": "Ypet (Venus variant)",      "peak_wl": 527, "channel": "green", "fwhm": 20, "color": "green"},
     "EGFP":         {"display_name": "EGFP",                      "peak_wl": 509, "channel": "green", "fwhm": 20, "color": "green"},
-    # 荧光素钠：发射 ~520 nm（绿通道），激发 ~494 nm。fwhm 是积分窗全宽
-    # （peak ± fwhm/2）；实际发射峰较宽（~40 nm），25 为先与其他选项保持
-    # 同档的保守值，需要更宽积分窗时调这一个数字即可。
+    # Fluorescein sodium: emission ~520 nm (green channel), excitation ~494 nm. fwhm is the full
+    # width of the integration window (peak +/- fwhm/2); the real emission peak is broader (~40 nm),
+    # so 25 is a conservative value that keeps it in the same class as the other options - raise this one number if you need a wider integration window.
     "FLUORESCEIN": {
         "display_name": "Fluorescein (sodium salt)",
         "peak_wl": 520, "channel": "green", "fwhm": 25, "color": "green",
-        "excitation_nm": 494,   # 元数据：界面无激发波长字段，先随配置记录
+        "excitation_nm": 494,   # metadata: the UI has no excitation-wavelength field, so it is recorded with the config for now
     },
     "MCHERRY":      {"display_name": "mCherry",                   "peak_wl": 610, "channel": "red",   "fwhm": 25, "color": "red"},
     "CFP":          {"display_name": "CFP",                       "peak_wl": 475, "channel": "blue",  "fwhm": 20, "color": "blue"},
     "MTURQUOISE2":  {"display_name": "mTurquoise2",               "peak_wl": 482, "channel": "blue",  "fwhm": 20, "color": "cyan"},
 }
 
-# 显式别名表：canonical ID -> 所有已知写法（大小写/空格/连字符差异由归一化吸收，
-# 但"哪些字符串算同一个荧光素"必须逐条列全，不做模糊匹配，避免误判）。
+# Explicit alias table: canonical ID -> every known spelling (case / space / hyphen differences are
+# absorbed by normalisation, but "which strings count as the same fluorophore" must be listed exhaustively - no fuzzy matching, to avoid false positives).
 _FLUOROPHORE_ALIASES = {
     "YPET": (
         "YPET", "ypet", "Ypet", "YPet",
@@ -58,12 +58,12 @@ _FLUOROPHORE_ALIASES = {
 
 
 def _normalize_fluorophore_name(name: str) -> str:
-    """归一化：小写 + 去掉空格/连字符/下划线，用于大小写与分隔符不敏感的比对。"""
+    """Normalise: lowercase + strip spaces/hyphens/underscores, for case- and separator-insensitive comparison."""
     return "".join(ch for ch in str(name).strip().lower() if ch not in " \t-_")
 
 
-# 归一化后的别名 -> canonical ID。canonical key 与 display_name 一并登记，
-# 这样"旧 Python 显示名"这类存量 preset 里的写法也能解析。
+# normalised alias -> canonical ID. Canonical keys and display_name are both registered, so legacy
+# spellings such as the old Python display names inside existing presets still resolve.
 _FLUOROPHORE_LOOKUP = {}
 for _cid, _aliases in _FLUOROPHORE_ALIASES.items():
     for _alias in (*_aliases, _cid, FLUOROPHORES[_cid]["display_name"]):
@@ -71,10 +71,10 @@ for _cid, _aliases in _FLUOROPHORE_ALIASES.items():
 
 
 def canonical_fluorophore(name: str | None) -> str | None:
-    """把任意写法解析成 canonical ID；无法识别返回 None。
+    """Resolve any spelling to a canonical ID; returns None when it cannot be recognised.
 
-    识别顺序：canonical 精确匹配 -> 归一化匹配（别名表 + display_name）。
-    大小写、空格、连字符/下划线差异一律不敏感。
+        Resolution order: exact canonical match -> normalised match (alias table + display_name).
+        Case, spaces and hyphen/underscore differences are all insensitive.
     """
     if name is None or not isinstance(name, str):
         return None
@@ -85,24 +85,24 @@ def canonical_fluorophore(name: str | None) -> str | None:
 
 
 def fluorophore_display_name(canonical_id: str | None) -> str | None:
-    """canonical ID -> 本地化显示名；未知 ID 原样返回（界面宁可显示原始串也不崩）。"""
+    """canonical ID -> localised display name; unknown IDs are returned unchanged (the UI prefers showing the raw string over crashing)."""
     if canonical_id is None:
         return None
     return FLUOROPHORES.get(canonical_id, {}).get("display_name", canonical_id)
 
 # =============================================================================
-# 核心算法默认参数 (供 core/calibration.py 等读取)
+# Core algorithm default parameters (read by core/calibration.py and others)
 # =============================================================================
 DEFAULT_PARAMS = {
-    "black_level": 64.0,                 # DNG 未提供黑电平元数据时的回退值
-    "display_percentile": 99.7,          # 预览归一化百分位
-    "spd_threshold_ratio": 0.1,          # SPD 可信阈值比例 (与 full_report 一致)
-    "valid_wavelength_range": (430.0, 660.0),  # 有效波段硬掩码 (与报告 Effective Band 一致)
-    "smooth_window": 21,                 # 平滑窗 (v1.4.5 流程中设为 1 可完全关闭平滑)
+    "black_level": 64.0,                 # fallback value when the DNG carries no black-level metadata
+    "display_percentile": 99.7,          # preview normalisation percentile
+    "spd_threshold_ratio": 0.1,          # SPD credibility threshold ratio (consistent with full_report)
+    "valid_wavelength_range": (430.0, 660.0),  # hard band mask (consistent with the report's Effective Band)
+    "smooth_window": 21,                 # smoothing window (set to 1 in the v1.4.5 flow to disable smoothing entirely)
 }
 
 # =============================================================================
-# UI 主题配置 (Theme Configuration)
+# UI theme configuration
 # =============================================================================
 THEME_ENABLED = True
 

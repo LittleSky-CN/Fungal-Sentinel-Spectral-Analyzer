@@ -1,27 +1,27 @@
 # main.py
 """FSSA v1.5.0 Main Entry Point.
 
-【v1.5.0】新增 Fluorescein (sodium salt) 荧光素选项（发射 520 nm / 激发 494 nm / green
-通道 / FWHM 25）；荧光素标识统一为 canonical ID（新增 canonical_fluorophore() 归一化解
-析），以便与 Android 端曲线预设互通。
-- 分析模式选择 (LoD/IUPAC、Legacy、Turbidity)
-- 可选霓虹主题 (gui/theme.py + config.py, 缺失时自动回退经典外观)
-- 统一团队图标 (gui/app_icon.py: 多尺寸透明底 .ico; Toplevel 自动继承)
-- Windows 高 DPI 感知
+[v1.5.0] Added the Fluorescein (sodium salt) fluorophore option (emission 520 nm / excitation 494 nm / green
+channel / FWHM 25); fluorophore identifiers are unified as canonical IDs (canonical_fluorophore() was added for
+normalised parsing) so curve presets interoperate with the Android app.
+- analysis mode selection (LoD/IUPAC, Legacy, Turbidity)
+- optional neon theme (gui/theme.py + config.py, falls back to the classic look when missing)
+- unified team icon (gui/app_icon.py: multi-size transparent .ico; Toplevels inherit it automatically)
+- Windows high-DPI awareness
 """
 import tkinter as tk
 from tkinter import ttk
 
 from gui.main_window import FSSA_GUI
 
-# ---- 图标模块安全导入 (缺失时静默降级, 不影响启动) ----
+# ---- safe import of the icon module (degrades silently when missing, startup is unaffected) ----
 try:
     from gui.app_icon import apply_app_icon
 except Exception:
     def apply_app_icon(root):
         return False
 
-# ---- 安全读取主题配置 ----
+# ---- safe read of the theme configuration ----
 try:
     from config import THEME_ENABLED
 except Exception:
@@ -34,14 +34,14 @@ except Exception:
 
 
 def _apply_theme_if_enabled(root):
-    """必须在 tk.Tk() 创建之后调用。"""
+    """Must be called after tk.Tk() has been created."""
     if not THEME_ENABLED:
         return
     try:
         from gui.theme import apply_theme
         from gui import theme as _t
         apply_theme(root, PIXEL_FONT.get("path"), PIXEL_FONT.get("family"))
-        # 模式选择页专用单选样式：黑底黄字，选中后绿字（保留原交互）
+        # radio style dedicated to the mode selection page: yellow text on black, green when selected (original interaction preserved)
         style = ttk.Style(root)
         style.configure("Sel.TRadiobutton",
                         background=_t.BLACK, foreground=_t.YELLOW,
@@ -55,7 +55,7 @@ def _apply_theme_if_enabled(root):
         print(f"[theme] skipped due to error: {e}")
 
 
-# ---- Windows 高 DPI 感知 ----
+# ---- Windows high-DPI awareness ----
 try:
     from ctypes import windll
     windll.shcore.SetProcessDpiAwareness(1)
@@ -66,7 +66,7 @@ except Exception:
 class ModeSelector:
     def __init__(self, root):
         self.root = root
-        apply_app_icon(root)            # 团队图标：初始选择窗口
+        apply_app_icon(root)            # team icon: initial selection window
         _apply_theme_if_enabled(root)
 
         self.root.title("FSSA v1.5.0 - Analysis Mode Selection")
@@ -117,7 +117,7 @@ class ModeSelector:
         self.root.destroy()
 
         main_root = tk.Tk()
-        apply_app_icon(main_root)       # 团队图标：主窗口（Details/浊度等 Toplevel 经 default 自动继承）
+        apply_app_icon(main_root)       # team icon: main window (Details / turbidity Toplevels inherit it via default)
         _apply_theme_if_enabled(main_root)
 
         app = FSSA_GUI(main_root, analysis_mode=selected_mode)
