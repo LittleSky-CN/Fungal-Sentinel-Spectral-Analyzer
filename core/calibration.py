@@ -1,13 +1,13 @@
 # core/calibration.py
 """Wavelength mapping and Spectral Power Distribution (SPD) calibration.
-【v1.5.0】荧光素标识统一为 canonical ID，APP_VERSION 升至 1.5.0，与 Android 端曲线预设互通。
+[v1.5.0] Fluorophore identifiers unified as canonical IDs, APP_VERSION raised to 1.5.0, interoperable with the Android curve presets.
 v1.4.3 simplification: per-channel absolute response, NO Savitzky-Golay, NO self-normalization.
 
-【SPD payload v3】响应曲线不再以像素为索引轴：``calibrate()`` 仍在逐像素域做除法，
-但输出一律重采样到规范波长网格（380-780 nm，1 nm 步长，401 点）。因此 preset 与
-任何 mapping 完全无关，Mode B（按当前 mapping 重算）与其依赖的像素域载荷
-``lamp_*`` / ``spd_reference`` 一并删除。``slope`` / ``intercept`` /
-``sensor_height`` 降级为纯诊断信息，绝不参与任何曲线重建。
+[SPD payload v3] The response curve is no longer indexed by pixel: ``calibrate()`` still divides in the
+per-pixel domain, but its output is always resampled onto the canonical wavelength grid
+(380-780 nm, 1 nm step, 401 points). A preset is therefore completely independent of any mapping, and Mode B
+(recomputing against the current mapping) was removed together with the per-pixel payloads ``lamp_*`` /
+``spd_reference`` it depended on. ``slope`` / ``intercept`` / ``sensor_height`` are demoted to purely diagnostic values and never take part in rebuilding any curve.
 """
 import json
 import math
@@ -36,12 +36,12 @@ DRIFT_SEVERE_NM = 10.0       # above this: orange warning + confirm.  Never a re
 DRIFT_FRACS = (0.10, 0.30, 0.50, 0.70, 0.90)
 MIN_VALID_POINTS = 20        # L1: a response curve with fewer live points is unusable
 COVERAGE_TOL_NM = 0.5        # L2: slack for the grid endpoints
-# L1: 可选数组键（Android 会写，Python 不写）；存在则长度必须 == grid_points
+# L1: optional array keys (Android writes them, Python does not); when present their length must equal grid_points
 SPD_OPTIONAL_ARRAYS = ("pos_r", "pos_g", "pos_b", "corr_r", "corr_g", "corr_b",
                        "weight_b", "weight_g", "weight_r", "fused")
-# L1: 可选标量键（不校验长度）
+# L1: optional scalar keys (length not checked)
 SPD_OPTIONAL_SCALARS = ("crossing_bg", "crossing_gr", "agreement_pct")
-# L1: 可选二元组键 [value, wavelength_nm]
+# L1: optional 2-tuple keys [value, wavelength_nm]
 SPD_OPTIONAL_PEAKS = ("peak_r", "peak_g", "peak_b", "fused_peak")
 
 
@@ -352,30 +352,30 @@ class SpectralResponseCalibrator:
     def __init__(self, mapping: LinearMapping):
         self.mapping = mapping
         self.valid_range = DEFAULT_PARAMS["valid_wavelength_range"]
-        self.smooth_window = DEFAULT_PARAMS["smooth_window"]  # 保留字段仅供 JSON 兼容，不再使用
+        self.smooth_window = DEFAULT_PARAMS["smooth_window"]  # kept only for JSON compatibility, no longer used
         self.spd_threshold_ratio = DEFAULT_PARAMS["spd_threshold_ratio"]
         self.wavelengths = self.response_R = self.response_G = self.response_B = None
         self.final_mask = None
-        # ---- v3 溯源 / 诊断字段（一切与像素有关的量都只作诊断） ----
-        self.rb_swapped = False         # R/B 通道是否互换（桌面端 DNG 直通，恒 False）
-        self.x_roi = None               # X 方向 ROI (start, end)，px
-        self.sensor_height = None       # 标定当时的像素行数（诊断用，不参与重建）
-        self.g_error_nm = None          # Step 1 G 点校验残差，nm
-        self.spd_source = None          # 参考灯谱 CSV 文件名
-        self.device_model = "unknown"   # 采集设备型号（桌面端无从得知，占位）
-        self.exposure_seconds = None    # 标定当时 SPD 曝光，s
-        self.frames = None              # 标定当时平均的 SPD 张数
+        # ---- v3 provenance / diagnostic fields (everything pixel-related is diagnostic only) ----
+        self.rb_swapped = False         # whether the R/B channels are swapped (desktop DNG passthrough, always False)
+        self.x_roi = None               # X-axis ROI (start, end), px
+        self.sensor_height = None       # pixel row count at calibration time (diagnostic only, not used for reconstruction)
+        self.g_error_nm = None          # Step 1 G-point verification residual, nm
+        self.spd_source = None          # reference lamp spectrum CSV filename
+        self.device_model = "unknown"   # capture device model (unknown on desktop, placeholder)
+        self.exposure_seconds = None    # SPD exposure at calibration time, s
+        self.frames = None              # number of averaged SPD frames at calibration time
         self.app_version = APP_VERSION
         self.created_at = None
         self.effective_band = None
         self.masked_count = None
         self.grid_points = None
-        self.drift_nm = None            # 与 preset 内嵌映射的漂移，nm（None = 未知）
+        self.drift_nm = None            # drift against the mapping embedded in the preset, nm (None = unknown)
         self.drift_level = "UNKNOWN"    # "OK" | "WARN" | "SEVERE" | "UNKNOWN"
 
     def calibrate(self, pixel_coords: np.ndarray, measured_rgb: np.ndarray,
                   true_spd_wl: np.ndarray, true_spd_val: np.ndarray):
-        # 1. 像素转波长（负斜率自动反转）—— 逐像素中间量，只为生成规范网格数据
+        # 1. Pixel -> wavelength (negative slopes are reversed automatically) - a per-pixel intermediate used only to build the canonical grid data
         wavelengths = np.asarray(self.mapping.pixel_to_wavelength(pixel_coords),
                                  dtype=np.float64)
         if wavelengths[0] > wavelengths[-1]:
@@ -383,27 +383,27 @@ class SpectralResponseCalibrator:
             measured_rgb = np.asarray(measured_rgb, dtype=np.float64)[::-1, :]
         self.sensor_height = int(wavelengths.size)
 
-        # 2. 真实 SPD 插值到相机波长点
+        # 2. Interpolate the true SPD onto the camera wavelength points
         f_interp = interp1d(true_spd_wl, true_spd_val, bounds_error=False, fill_value=0.0)
         true_spd_aligned = f_interp(wavelengths)
 
-        # 3. 光源可信阈值掩码 + 波长范围掩码
+        # 3. Lamp credibility threshold mask + wavelength range mask
         max_spd = np.max(true_spd_aligned)
         spd_threshold = max_spd * self.spd_threshold_ratio
         reliable_spd_mask = true_spd_aligned > spd_threshold
         range_mask = (wavelengths >= self.valid_range[0]) & (wavelengths <= self.valid_range[1])
         final_mask = range_mask & reliable_spd_mask
 
-        # 4. 逐通道绝对响应度 = 灯谱测量 / 真实 SPD（不合并通道）
-        # 【v1.4.3 简化】不做 SG 平滑、不做逐通道自归一化：保留绝对物理量
+        # 4. Per-channel absolute responsivity = lamp measurement / true SPD (channels are not merged)
+        # [v1.4.3 simplification] no SG smoothing and no per-channel self-normalisation: absolute physical quantities are preserved
         epsilon = 1e-6
         raw = measured_rgb / (true_spd_aligned[:, None] + epsilon)
         raw[~final_mask, :] = 0.0
 
-        # 5. 重采样到规范波长网格 —— 输出从此与像素彻底解耦
+        # 5. Resample onto the canonical wavelength grid - from here the output is fully decoupled from pixels
         grid = canonical_grid()
-        # mask 用 "> 1 - 1e-9" 而不是 "> 0.5"：网格点若跨在掩码边界上，np.interp 会把
-        # 掩码外的 0 混进来，该点响应最多被削掉一半。只保留完全落在掩码内的网格点。
+        # the mask uses "> 1 - 1e-9" rather than "> 0.5": if a grid point straddles the mask boundary, np.interp
+        # mixes in zeros from outside the mask and that point's response is cut by up to half. Only grid points fully inside the mask are kept.
         mask_grid = resample_to_grid(wavelengths, final_mask.astype(np.float64), grid)
         keep = mask_grid >= 1.0 - 1e-9
         responses = np.column_stack(
@@ -421,7 +421,7 @@ class SpectralResponseCalibrator:
         self.response_B = np.ascontiguousarray(responses[:, 2])
         return self.response_R, self.response_G, self.response_B
 
-    # ================= 参数导出与导入（JSON） =================
+    # ================= Parameter export and import (JSON) =================
     def save_params(self, filepath: str):
         """Write an SPD payload v3 preset -- indexed by wavelength, never by pixel."""
         grid = (np.asarray(self.wavelengths, dtype=np.float64)
@@ -457,7 +457,7 @@ class SpectralResponseCalibrator:
             "spd_threshold_ratio": float(self.spd_threshold_ratio),
             "masked_count": int(np.count_nonzero(live)),
             "grid_points": int(grid.size),
-            # ---- 以下与像素有关的一律只作诊断，绝不用于重建任何曲线 ----
+            # ---- everything pixel-related below is diagnostic only and is never used to rebuild any curve ----
             "slope": _opt_float(self.mapping.slope_k) if self.mapping is not None else None,
             "intercept": _opt_float(self.mapping.intercept_b) if self.mapping is not None else None,
             "g_error_nm": _opt_float(self.g_error_nm),
@@ -501,7 +501,7 @@ class SpectralResponseCalibrator:
         if not isinstance(data, dict):
             raise ValueError(f"SPD preset {filepath} is not a JSON object.")
 
-        # ---- L0 版本闸门 ----
+        # ---- L0 version gate ----
         schema = data.get("schema_version")
         if isinstance(schema, bool) or not isinstance(schema, int) \
                 or schema != SPD_SCHEMA_VERSION:
@@ -529,7 +529,7 @@ class SpectralResponseCalibrator:
             instance.final_mask = ((instance.response_R > 0) | (instance.response_G > 0)
                                    | (instance.response_B > 0))
 
-        # ---- 溯源 / 诊断字段 ----
+        # ---- provenance / diagnostic fields ----
         instance.app_version = data.get("app_version")
         instance.created_at = data.get("created_at")
         instance.device_model = data.get("device_model") or "unknown"
@@ -546,7 +546,7 @@ class SpectralResponseCalibrator:
         instance.x_roi = tuple(int(v) for v in x_roi) if isinstance(x_roi, (list, tuple)) \
             and len(x_roi) == 2 else None
 
-        # ---- L3 漂移（软提示，永不拒绝） ----
+        # ---- L3 drift (soft notice, never rejects) ----
         preset_mapping = None
         slope, intercept = data.get("slope"), data.get("intercept")
         if slope is not None and intercept is not None:
@@ -558,7 +558,7 @@ class SpectralResponseCalibrator:
         instance.drift_nm = drift_nm(preset_mapping, mapping, n_px)
         instance.drift_level = drift_level(instance.drift_nm)
 
-        # ---- L2 覆盖度 ----
+        # ---- L2 coverage ----
         if strict:
             _validate_spd_coverage(mapping, n_px, wavelengths, instance.valid_range)
         return instance

@@ -1,9 +1,9 @@
 # gui/main_window.py
 """Main GUI Window for FSSA v1.5.0 (Spectral Unmixing LoD + Weighted Fusion + Turbidity).
 
-【v1.5.0】新增 Fluorescein (sodium salt) 荧光素选项（发射 520 nm / 激发 494 nm / green
-通道 / FWHM 25）；荧光素标识统一为 canonical ID（新增 canonical_fluorophore() 归一化解
-析），以便与 Android 端曲线预设互通。
+[v1.5.0] Added the Fluorescein (sodium salt) fluorophore option (emission 520 nm / excitation 494 nm / green
+channel / FWHM 25); fluorophore identifiers are unified as canonical IDs (canonical_fluorophore() was added for
+normalised parsing) so curve presets interoperate with the Android app.
 Theme-aware (gui/theme.py optional): neon-pop look when enabled, classic look otherwise.
 """
 import re
@@ -44,7 +44,7 @@ from core.unmixing import (unmix_spectrum, select_reference_emission,
 from gui.widgets import MultiFileSelector
 from gui.details_window import DetailsWindow
 
-# ---- 主题安全配置 ----
+# ---- theme-safe configuration ----
 try:
     from config import THEME_ENABLED
 except Exception:
@@ -61,19 +61,19 @@ _THEME_ON = bool(THEME_ENABLED and _theme is not None)
 
 
 # ---------------------------------------------------------------------------
-# Step 1 标定质量 -> 状态行文案与颜色
+# Step 1 calibration quality -> status line wording and colour
 #
-# 背景：Step 1 的结果有可能是 WARNING 甚至 FAILED（|G 点残差| 超过 2.5 / 10 nm，
-# 见 core.image_processing.QUALITY_PASS_NM / QUALITY_WARNING_NM），但状态行以前是
-# 无条件绿色的 "Done!"，用户会误以为数据可信。现在非 PASS 一律不许看起来像成功。
+# Background: a Step 1 result may be WARNING or even FAILED (|G-point residual| beyond 2.5 / 10 nm,
+# see core.image_processing.QUALITY_PASS_NM / QUALITY_WARNING_NM), yet the status line used to be an
+# unconditional green "Done!", which made users believe the data was trustworthy. Anything that is not PASS must no longer look like success.
 #
-# FAILED 时仍会设置 self.mapping：core.calibrate_wavelength 故意返回尽力而为的
-# 结果（FAILED 还会试另一种 R/B 交换态取误差更小者），Android
-# WavelengthCalibrator.kt 也是同样策略、只染红徽章不阻断流程。所以这里不硬阻断，
-# 只把颜色和弹窗拉满，让用户知道下游定量会受影响。
+# On FAILED self.mapping is still set: core.calibrate_wavelength deliberately returns a best-effort
+# result (on FAILED it also tries the other R/B swap state and keeps whichever has the smaller error), and Android
+# WavelengthCalibrator.kt follows the same policy - it only paints the badge red and does not block the flow.
+# So we do not hard-block here either; we only push the colour and the dialogs to the maximum so users know downstream quantitation is affected.
 # ---------------------------------------------------------------------------
 def _step1_live_status(quality, exp_first, wl_err):
-    """实时标定：返回 ``(文案, 颜色)``。"""
+    """Live calibration: returns ``(wording, colour)``."""
     tier = step1_quality_tier(quality)
     exposure = f"Exp: {exp_first:.4f}s" if exp_first is not None else "Exp: n/a"
     if tier == "PASS":
@@ -86,7 +86,7 @@ def _step1_live_status(quality, exp_first, wl_err):
 
 
 def _step1_preset_status(file_name, quality, g_error):
-    """导入 WAVELENGTH preset：返回 ``(文案, 颜色)``。"""
+    """Import a WAVELENGTH preset: returns ``(wording, colour)``."""
     tier = step1_quality_tier(quality)
     label = quality if isinstance(quality, str) and quality else "unknown"
     detail = f"Loaded from {file_name}"
@@ -117,40 +117,40 @@ class FSSA_GUI:
         self.mapping = None
         self.x_roi = None
         self.calibrator = None
-        self.spd_params_path = None      # 最近一次导入/导出的 SPD preset 路径（供 Mode B 重算）
-        self.rb_swapped = False           # 【v1.4.6】Step 1 反序自检结论，驱动后续帧的 R/B 重标注
-        # canonical ID（= Android enum name），显示时再转 display_name
+        self.spd_params_path = None      # path of the most recently imported/exported SPD preset (used by Mode B recomputation)
+        self.rb_swapped = False           # [v1.4.6] result of the Step 1 reverse-order self-check; drives R/B relabelling of later frames
+        # canonical ID (= Android enum name); converted to display_name only for display
         self.current_fluorophore = "YPET"
         self.current_page = 1
         self.current_chart_filename = "FSSA_Chart"
 
-        # 【修复】这里只初始化空字典，不要在这里计算 SPD 数据！
+        # [fix] only initialise an empty dict here - do not compute SPD data here!
         self.cache_step1 = {}
         self.cache_step2 = {}
         self.cache_step3 = {}
         self.cache_step4 = {}
         self.curve_preset = None
-        # 【v1.4.7】turbidity 模式不建 Step 4，这三个句柄保持 None；预设按钮随之隐藏
+        # [v1.4.7] turbidity mode builds no Step 4, so these three handles stay None and the preset buttons are hidden accordingly
         self.curve_preset_frame = None
         self.btn_clear_curve_preset = None
         self.lbl_curve_preset = None
-        # turbidity 模式没有荧光素下拉框，此句柄保持 None
+        # turbidity mode has no fluorophore dropdown, so this handle stays None
         self.lbl_fluor_channel = None
-        # 【溯源】记录每一步参数来自导入的 preset 还是本次现场标定
+        # [provenance] records whether each step's parameters came from an imported preset or from this live calibration
         self.preset_provenance = {"step1": None, "step2": None, "step3": None, "step4": None}
 
         self.turbidity_window = None
         self.details_window = None
         self._lod_headline = None
 
-        # 【主题】仅在此处应用全局样式（必须在 setup_ui 之前、root 存在之后）
+        # [theme] apply the global style only here (must run before setup_ui and after root exists)
         if _THEME_ON:
             _theme.apply_theme(self.root, PIXEL_FONT.get("path"), PIXEL_FONT.get("family"))
             self._extend_theme_styles()
 
         self.setup_ui()
 
-    # ================= 主题辅助 =================
+    # ================= theme helpers =================
     def _extend_theme_styles(self):
         st = ttk.Style(self.root)
         st.configure("Head.TLabel", background=_theme.BLACK, foreground=_theme.CYAN, font=_theme.H(12))
@@ -220,7 +220,7 @@ class FSSA_GUI:
         left_frame.pack(side=tk.LEFT, fill=tk.Y)
         left_frame.pack_propagate(False)
 
-        # 【主题】横幅 + 版本号：必须在 left_frame 创建之后
+        # [theme] banner + version number: must run after left_frame is created
         if _THEME_ON:
             self.banner = _theme.StepBanner(left_frame)
             self.banner.pack(fill=tk.X, pady=(10, 0))
@@ -246,9 +246,9 @@ class FSSA_GUI:
 
         self.max_steps = 3 if self.is_turbidity_mode else 4
 
-        # 【v1.4.7】Step 4 专属：turbidity 模式没有 Step 4 页面，三个预设按钮必须一起隐藏，
-        # 否则用户能点到 load_curve_preset() → calculate_concentration()，去碰从未初始化的
-        # Step 4 控件（std_rows / btn_calc_conc / txt_result ...）。句柄保持 None，引用处判空。
+        # [v1.4.7] Step 4 only: turbidity mode has no Step 4 page, so the three preset buttons must be hidden together;
+        # otherwise the user could click load_curve_preset() -> calculate_concentration() and touch Step 4 widgets that were
+        # never initialised (std_rows / btn_calc_conc / txt_result ...). The handles stay None and callers null-check them.
         if not self.is_turbidity_mode:
             self.curve_preset_frame = ttk.Frame(left_frame)
             preset_buttons = ttk.Frame(self.curve_preset_frame)
@@ -306,7 +306,7 @@ class FSSA_GUI:
         res_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
         self.txt_result = scrolledtext.ScrolledText(res_frame, height=8, font=("Consolas", 10))
         self.txt_result.pack(fill=tk.X)
-        # 【主题】日志终端化：必须在 txt_result 创建之后
+        # [theme] terminal-style log: must run after txt_result is created
         if _THEME_ON:
             self.txt_result.configure(bg=_theme.BLACK, fg=_theme.CONSOLE, insertbackground=_theme.CONSOLE,
                                       selectbackground=_theme.MAGENTA, selectforeground=_theme.INK,
@@ -314,7 +314,7 @@ class FSSA_GUI:
                                       highlightbackground=_theme.CYAN)
 
     def _collapsible_section(self, master, title, initially_open=False):
-        """可折叠选项区：默认收纳，点击标题展开/收起。返回 body Frame。"""
+        """Collapsible options area: collapsed by default, click the title to expand or collapse. Returns the body Frame."""
         holder = ttk.Frame(master)
         holder.pack(fill=tk.X, pady=5)
         body = ttk.Frame(holder, style="Card.TFrame") if _THEME_ON else ttk.Frame(holder)
@@ -389,7 +389,7 @@ class FSSA_GUI:
         else:
             self._head_label(f, "Step 3: Sample Analysis", "purple").pack(anchor=tk.W, pady=(0, 10))
             self._sub_label(f, "Select Fluorophore:").pack(anchor=tk.W)
-            # 下拉框显示 display_name（用户可见文字不变），内部一律存 canonical ID
+            # the dropdown shows display_name (the text users see is unchanged); canonical IDs are stored internally
             self.fluor_combo = ttk.Combobox(
                 f, values=[cfg["display_name"] for cfg in FLUOROPHORES.values()],
                 state="readonly", width=25)
@@ -433,7 +433,7 @@ class FSSA_GUI:
         f = self.page4
         self._head_label(f, "Step 4: Concentration Quantification", "red").pack(anchor=tk.W, pady=(0, 10))
 
-        # ---- 标准品滚动列表 ----
+        # ---- scrollable standard list ----
         canvas_frame = ttk.Frame(f); canvas_frame.pack(fill=tk.BOTH, expand=True, pady=5)
         self.std_canvas = tk.Canvas(canvas_frame, highlightthickness=0)
         if _THEME_ON:
@@ -441,7 +441,7 @@ class FSSA_GUI:
         scrollbar = ttk.Scrollbar(canvas_frame, orient="vertical", command=self.std_canvas.yview)
         self.std_rows_frame = ttk.Frame(self.std_canvas)
 
-        # 【修复1】内嵌框架宽度跟随画布 → 卡片随左栏扩充而变宽
+        # [fix 1] the embedded frame width follows the canvas, so cards widen as the left column grows
         self._std_win_id = self.std_canvas.create_window((0, 0), window=self.std_rows_frame, anchor="nw")
         def _on_canvas_configure(e):
             self.std_canvas.itemconfig(self._std_win_id, width=e.width)
@@ -452,7 +452,7 @@ class FSSA_GUI:
         self.std_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-        # 【修复2】恢复滚轮绑定，且仅当指针位于标准品列表内才生效
+        # [fix 2] restore the wheel binding, and let it take effect only while the pointer is inside the standard list
         def _in_std(widget):
             return self._wheel_target_in_region(widget, self.root, self.std_canvas)
 
@@ -473,7 +473,7 @@ class FSSA_GUI:
 
         self.std_rows = []
 
-        # ---- 【修复3】可折叠选项区（默认收纳）+ 手动换行防截断 ----
+        # ---- [fix 3] collapsible options area (collapsed by default) + manual wrapping to prevent truncation ----
         metric_body = self._collapsible_section(f, "Quantification Metric")
         self.metric_mode = tk.StringVar(value="unmixing")
         self._radio(metric_body,
@@ -495,11 +495,11 @@ class FSSA_GUI:
                     text="Weighted (1/y²):\n  for fluorescence (Recommended)",
                     variable=self.regression_method, value="weighted_1y2").pack(anchor=tk.W, pady=2)
 
-        # ---- 操作按钮 ----
+        # ---- action buttons ----
         btn_frame = ttk.Frame(f); btn_frame.pack(fill=tk.X, pady=5)
         btn_frame = ttk.Frame(f); btn_frame.pack(fill=tk.X, pady=5)
-        btn_frame.columnconfigure(0, weight=1)   # + Add Std 占 1 份
-        btn_frame.columnconfigure(1, weight=2)   # Build Curve 占 2 份
+        btn_frame.columnconfigure(0, weight=1)   # + Add Std takes 1 share
+        btn_frame.columnconfigure(1, weight=2)   # Build Curve takes 2 shares
         self.btn_add_std = self._btn(btn_frame, "+ Add Std", kind="yellow", command=self.add_std_row)
         self.btn_add_std.grid(row=0, column=0, sticky="we", padx=(0, 2))
         self.btn_calc_conc = self._btn(btn_frame, "Build Curve & Calculate", kind="magenta", command=self.calculate_concentration)
@@ -520,7 +520,7 @@ class FSSA_GUI:
         self.lbl_page_num.config(text=f"Step {page_num} / {self.max_steps}")
         self.btn_prev.config(state="normal" if page_num > 1 else "disabled")
         self.btn_next.config(state="normal" if page_num < self.max_steps else "disabled")
-        # 【主题】横幅步骤同步：必须在 banner 存在后调用
+        # [theme] banner step sync: must be called after the banner exists
         if _THEME_ON and hasattr(self, "banner"):
             self.banner.set_text(f"STEP {page_num}/{self.max_steps}")
 
@@ -540,16 +540,16 @@ class FSSA_GUI:
             self.lbl_csv.config(text=Path(path).name, foreground=self._dyn_fg("black"))
 
     def on_fluorophore_change(self, event):
-        # 下拉框里是 display_name，反查回 canonical；解析不出来就保留原值
+        # the dropdown holds display_name; map it back to canonical and keep the original value when it cannot be resolved
         self.current_fluorophore = (canonical_fluorophore(self.fluor_combo.get())
                                     or self.current_fluorophore)
         self._update_fluor_channel_label()
 
     def _update_fluor_channel_label(self):
-        """把当前荧光素的通道/峰位/FWHM 显示在 Step 3 下拉框下方。
+        """Show the current fluorophore's channel / peak / FWHM below the Step 3 dropdown.
 
-        报告 Tab 3 早就带 Channel 一行，但 Step 3 主界面与日志里只有荧光素名，
-        用户选完不知道这次会走 R/G/B 哪条通道。这里与报告口径保持一致。
+        Report Tab 3 has carried a Channel row for a long time, but the Step 3 main screen and the log showed only
+        the fluorophore name, so after picking one the user did not know which of R/G/B would be used. This keeps the same wording as the report.
         """
         if self.lbl_fluor_channel is None:
             return
@@ -571,10 +571,10 @@ class FSSA_GUI:
 
     def _record_provenance(self, step, kind, *, preset_type=None, file_path=None,
                            preset_name=None, params=None):
-        """记录某一步参数的来源，供报告窗口做预设溯源。
+        """Record where a step's parameters came from, for the preset provenance page of the report window.
 
-        ``kind`` 为 ``"preset"``（来自导入文件）或 ``"live"``（本次现场标定）。
-        ``preset_type`` 与 Android ``PresetStorage.PresetTypes`` 保持一致：
+        ``kind`` is ``"preset"`` (from an imported file) or ``"live"`` (calibrated in this session).
+        ``preset_type`` is kept consistent with Android ``PresetStorage.PresetTypes``:
         ``WAVELENGTH`` / ``SPD`` / ``CURVE``。
         """
         if not hasattr(self, "preset_provenance") or self.preset_provenance is None:
@@ -597,9 +597,9 @@ class FSSA_GUI:
         }
 
     def _clear_provenance(self, step):
-        """清掉某一步的溯源：预设被解除或导入被回滚时调用。
+        """Clear a step's provenance: called when a preset is released or an import is rolled back.
 
-        报告的溯源页不能继续声称参数来自一个已经不再生效的预设文件。
+        The report's provenance page must not keep claiming that parameters come from a preset file that is no longer in effect.
         """
         if not isinstance(getattr(self, "preset_provenance", None), dict):
             self.preset_provenance = {"step1": None, "step2": None, "step3": None, "step4": None}
@@ -688,8 +688,8 @@ class FSSA_GUI:
                     "frames": preset.get("frames"),
                 })
 
-            # 【SPD payload v3】preset 自带波长轴，响应曲线与像素映射无关，
-            # 不再需要"换了 mapping 就重算 SPD"的联动。
+            # [SPD payload v3] the preset carries its own wavelength axis, so the response curve is independent of the pixel mapping;
+            # the "recompute the SPD whenever the mapping changes" coupling is no longer needed.
 
             err_text = f"{g_error:+.2f} nm" if g_error is not None else "未知"
             detail = (f"Wavelength preset loaded from:\n{file_path}\n"
@@ -748,7 +748,7 @@ class FSSA_GUI:
     def _load_spd_params_from(self, file_path, silent=False):
         """Load an SPD preset without touching ``self.calibrator`` until it validates.
 
-        【v1.4.6 修复】旧实现先赋值再校验，校验失败时 ``self.calibrator`` 已被污染。
+        [v1.4.6 fix] the old implementation assigned first and validated afterwards, so self.calibrator was already polluted when validation failed.
         """
         calibrator = SpectralResponseCalibrator.load_params(file_path, self.mapping, strict=True)
         previous = self.calibrator
@@ -759,19 +759,19 @@ class FSSA_GUI:
             "R": calibrator.response_R, "G": calibrator.response_G, "B": calibrator.response_B,
             "spd_threshold_ratio": calibrator.spd_threshold_ratio,
             "loaded_from_file": True,
-            # 【补充】占位键：让 details 窗口不报错，但 _build_tab2 的 else 分支会显示提示
+            # [addition] placeholder key: keeps the details window from raising, while the else branch of _build_tab2 shows a notice
             "measured_total": None,
             "corrected_total": None,
             "pos_R": None, "pos_G": None, "pos_B": None,
             "final_mask": calibrator.final_mask,
         }
         self.log_status(2, f"Loaded from {Path(file_path).name}", "green")
-        if not self._report_spd_drift(calibrator):     # SEVERE 且用户取消 -> 回滚
+        if not self._report_spd_drift(calibrator):     # SEVERE and the user cancelled -> roll back
             self.calibrator = previous
             self.spd_params_path = None
             self.cache_step2 = {}
-            # 回滚同时丢弃 Step2 的溯源：本次导入未被采纳，
-            # 报告不能继续声称参数来自某个已被丢弃的预设文件。
+            # rolling back also drops the Step 2 provenance, because this import was not accepted and
+            # the report must not keep claiming the parameters come from a preset file that has been discarded.
             self._clear_provenance(2)
             self.log_status(2, "Load cancelled (severe mapping drift).", "orange")
             return False
@@ -809,7 +809,7 @@ class FSSA_GUI:
         return True
 
     def _report_spd_drift(self, calibrator):
-        """L3 分级提示（软 WARN，永不拒绝）。返回 False 表示用户在 SEVERE 确认框中取消。"""
+        """L3 graded notice (soft WARN, never rejects). Returns False if the user cancels the SEVERE confirmation."""
         drift = getattr(calibrator, "drift_nm", None)
         level = getattr(calibrator, "drift_level", "UNKNOWN")
         if drift is None or level in ("OK", "UNKNOWN"):
@@ -838,7 +838,7 @@ class FSSA_GUI:
         if not file_path:
             return
         try:
-            # 导出一律写 canonical ID，Android 端才能对上
+            # exports always write canonical IDs so the Android side can match them
             export_fluor = (canonical_fluorophore(self.cache_step4.get("fluorophore"))
                             or self.current_fluorophore)
             save_curve_preset(
@@ -848,8 +848,8 @@ class FSSA_GUI:
             messagebox.showerror("Error", f"Could not save curve preset:\n{e}")
 
     def load_curve_preset(self):
-        # 【v1.4.7】turbidity 模式没有 Step 4：按钮已隐藏，这里再兜一层，
-        # 避免任何路径（含自动化/复用实例）走进未初始化的 Step 4 控件。
+        # [v1.4.7] turbidity mode has no Step 4: the button is already hidden, and this is a second guard so that
+        # no path (including automation or reused instances) can reach uninitialised Step 4 widgets.
         if self.curve_preset_frame is None:
             return
         file_path = filedialog.askopenfilename(
@@ -858,19 +858,19 @@ class FSSA_GUI:
             return
         try:
             preset = read_curve_preset(file_path, self.analysis_mode)
-            # Android 写 canonical ID，Python 存量 preset 写旧显示名，两种都能解析
+            # Android writes canonical IDs while legacy Python presets write old display names; both resolve
             fluor_id = canonical_fluorophore(preset.get("fluorophore"))
             if fluor_id is None:
                 raise ValueError("The preset fluorophore is not available in this version.")
-            preset["fluorophore"] = fluor_id      # 下游一律用 canonical
+            preset["fluorophore"] = fluor_id      # downstream code always uses canonical
             self.curve_preset = preset
             self.current_fluorophore = fluor_id
             if not self.is_turbidity_mode:
-                # 预设加载时把下拉框同步到曲线自带的荧光素，但**不要锁死**：
-                # calculate_with_curve_preset 用的是 preset["fluorophore"]，
-                # 与 Step 3 当前选什么完全无关（日志也会报 Preset fluorophore），
-                # 锁死只会让用户在 Step 3 无法分析别的染料（下拉能展开、选择却
-                # 不生效，看起来就像"填了数据没改 UI"）。
+                # loading a preset syncs the dropdown to the fluorophore carried by the curve, but must **not lock it**:
+                # calculate_with_curve_preset uses preset["fluorophore"] and is completely independent of whatever Step 3
+                # currently selects (the log also reports the preset fluorophore), so locking it would only stop users from
+                # analysing another dye in Step 3 - the dropdown would still open and accept a choice that then has no effect,
+                # which looks exactly like "I entered data but the UI did not react".
                 self.fluor_combo.set(fluorophore_display_name(fluor_id))
             self.btn_calc_conc.config(text="Calculate with Curve Preset")
             self.btn_clear_curve_preset.config(state="normal")
@@ -884,7 +884,7 @@ class FSSA_GUI:
                     "intercept": preset["fit"].get("intercept"),
                     "r2": preset["fit"].get("r_squared"),
                     "metric_mode": preset["metric_mode"],
-                    # 报告/溯源给人看，显示 display_name 而不是大写 canonical
+                    # reports and provenance are for humans: show display_name rather than the upper-case canonical ID
                     "fluorophore": fluorophore_display_name(fluor_id),
                     "n_standards": len(preset["concentrations"]),
                     "regression_method": preset["regression_method"],
@@ -892,8 +892,8 @@ class FSSA_GUI:
 
             sample_files = self.sample_selector.get_files()
             blank_files = self.blank_selector.get_files()
-            # 续跑的前提是 Step1/Step2 都已就绪，否则 calculate_with_curve_preset
-            # 只会弹一个 "Please complete Step 1 & 2 first!"，流程照样断在这里。
+            # resuming requires Step 1 and Step 2 to be ready; otherwise calculate_with_curve_preset simply
+            # pops "Please complete Step 1 & 2 first!" and the flow breaks here anyway.
             missing_steps = []
             if self.mapping is None:
                 missing_steps.append("Step 1 (wavelength mapping)")
@@ -907,8 +907,8 @@ class FSSA_GUI:
                     f"Curve preset loaded. Complete {needed} before calculating.")
                 return
             if sample_files and blank_files:
-                # 只有确认马上会用预设重算时才丢弃旧的现场曲线；
-                # 不能重算时保留它，用户此前算好的结果不会被无声清空。
+                # discard the previous live curve only when we are certain a preset recomputation will run;
+                # when it cannot run, keep it so results the user already computed are not silently wiped.
                 self.cache_step4 = {}
                 self.log_status(4, "Preset loaded; running calculation...", "orange")
                 self.root.after(150, self.calculate_concentration)
@@ -926,17 +926,17 @@ class FSSA_GUI:
             messagebox.showerror("Error", f"Could not load curve preset:\n{e}")
 
     def clear_curve_preset(self):
-        # 【v1.4.7】同 load_curve_preset：turbidity 模式下按钮不存在，直接跳过。
+        # [v1.4.7] same as load_curve_preset: in turbidity mode the button does not exist, so skip outright.
         if self.curve_preset_frame is None:
             return
         self.curve_preset = None
-        # 预设已解除，报告的溯源页不能再声称 Step 4 来自导入的 CURVE 预设
+        # the preset was released, so the report's provenance page must no longer claim that Step 4 came from an imported CURVE preset
         self._clear_provenance(4)
         self.btn_calc_conc.config(text="Build Curve & Calculate")
         self.btn_clear_curve_preset.config(state="disabled")
         self.lbl_curve_preset.config(text="No curve preset loaded")
-        # 荧光素下拉框不再随曲线预设 lock/unlock：calculate_with_curve_preset
-        # 用曲线自带的 fluorophore，与 Step 3 的选择无关。
+        # the fluorophore dropdown no longer locks or unlocks with the curve preset: calculate_with_curve_preset
+        # uses the fluorophore carried by the curve and is unrelated to the Step 3 selection.
         self.log_status(4, "Curve preset cleared.", "gray")
 
     # ================= Core Signal Extraction =================
@@ -1034,7 +1034,7 @@ class FSSA_GUI:
             rgb_first, exp_first = frame["rgb"], frame["exposure"]
             self.x_roi = frame["x_roi"]
             avg_profiles = get_average_profiles(pos_files, self.x_roi)
-            # 【v1.4.6】两点拟合 + R/B 反序自检（与 Android WavelengthCalibrator 一致）
+            # [v1.4.6] two-point fit + R/B reverse-order self-check (consistent with Android WavelengthCalibrator)
             fit = calibrate_wavelength(avg_profiles, knowns)
             if fit is None:
                 raise RuntimeError("No usable R/G/B peaks in the positioning frame.")
@@ -1051,7 +1051,7 @@ class FSSA_GUI:
             validation = TwoPointValidation(("B", "R"), "G", k, b, pred_y, hold.y_centroid, res_px, wl_err)
             self.log_status(1, *_step1_live_status(fit["quality"], exp_first, wl_err))
             if step1_quality_tier(fit["quality"]) == "FAILED":
-                # 不硬阻断（见 calibrate_wavelength 的策略），但必须让用户知道
+                # do not hard-block (see the calibrate_wavelength policy), but the user must be told
                 messagebox.showwarning(
                     "波长标定质量不合格 (FAILED)",
                     f"G 点校验残差 {wl_err:+.2f} nm，已超过 {QUALITY_WARNING_NM} nm 阈值。\n\n"
@@ -1065,7 +1065,7 @@ class FSSA_GUI:
                         f"Mapping: p = {k:.4f} * λ + {b:.2f}\n"
                         f"G-point Error: {wl_err:+.2f} nm ({fit['quality']})\n")
             self.txt_result.insert(tk.END, log_text); self.txt_result.see(tk.END)
-            # 【v1.4.6】sensor_size=(width, height) 与 known_wls 供 Step 1 preset 落盘
+            # [v1.4.6] sensor_size=(width, height) and known_wls are written into the Step 1 preset
             self.cache_step1 = {"rgb": rgb_first, "x_roi": self.x_roi, "profiles": avg_profiles, "peaks": peaks,
                                 "mapping": self.mapping, "validation": validation, "exp_time": exp_first,
                                 "wl_err": wl_err, "n_pos": len(pos_files),
@@ -1118,7 +1118,7 @@ class FSSA_GUI:
 
             self.calibrator = SpectralResponseCalibrator(self.mapping)
             self.calibrator.calibrate(y_pixels, measured_rgb, true_wl, true_val)
-            # 【v1.4.6】溯源字段：写进 SPD preset，供加载端做漂移提示与 Mode B 重算
+            # [v1.4.6] provenance fields: written into the SPD preset so the loader can warn about drift and recompute Mode B
             self.calibrator.spd_source = Path(self.csv_file).name if self.csv_file else None
             self.calibrator.x_roi = tuple(int(v) for v in self.x_roi) if self.x_roi else None
             self.calibrator.g_error_nm = self.cache_step1.get("wl_err")
@@ -1132,10 +1132,10 @@ class FSSA_GUI:
 
             wl_order_check = self.mapping.pixel_to_wavelength(y_pixels)
             descending = wl_order_check[0] > wl_order_check[-1]
-            # 【SPD payload v3】响应轴已是规范波长网格，独立验证数据必须重采样到同一轴，
-            # 否则 details_window 的 len(pos_R) == len(wls) 会不成立、Figure 4a/4b 退化成占位。
+            # [SPD payload v3] the response axis is already the canonical wavelength grid, so the independent verification data
+            # must be resampled onto the same axis; otherwise len(pos_R) == len(wls) fails in details_window and Figures 4a/4b degrade into placeholders.
             wl_asc = wl_order_check[::-1] if descending else wl_order_check
-            # 【v1.4.4-fix】独立验证数据：定位光源剖面（Step 1 缓存），按波长对齐
+            # [v1.4.4-fix] independent verification data: the locating-lamp profile (Step 1 cache), aligned by wavelength
             pos_R = pos_G = pos_B = None
             pos_profiles = self.cache_step1.get("profiles")
             if pos_profiles is not None:
@@ -1146,8 +1146,8 @@ class FSSA_GUI:
                     pos_G = resample_to_grid(wl_asc, pos_aligned[:, 1])
                     pos_B = resample_to_grid(wl_asc, pos_aligned[:, 2])
 
-            # 【关键修复】计算 measured_total 和 corrected_total，供 Details Tab 2 第二张子图使用
-            # 【SPD payload v3】响应轴已是规范波长网格，分子必须重采样到同一轴
+            # [critical fix] compute measured_total and corrected_total for the second subplot of Details Tab 2
+            # [SPD payload v3] the response axis is already the canonical wavelength grid, so the numerator must be resampled onto the same axis
             measured_total = resample_to_grid(wl_asc, np.sum(measured_rgb, axis=1)[::-1]
                                               if descending else np.sum(measured_rgb, axis=1))
             resp_sum = self.calibrator.response_R + self.calibrator.response_G + self.calibrator.response_B
@@ -1155,7 +1155,7 @@ class FSSA_GUI:
             corrected_total = measured_total / resp_sum
             corrected_total = np.nan_to_num(corrected_total, nan=0.0, posinf=0.0, neginf=0.0)
 
-            # 【关键修复】缓存字典必须包含这两个键
+            # [critical fix] the cache dict must contain these two keys
             self.cache_step2 = {
                 "wavelengths": self.calibrator.wavelengths,
                 "R": self.calibrator.response_R, "G": self.calibrator.response_G, "B": self.calibrator.response_B,
@@ -1165,7 +1165,7 @@ class FSSA_GUI:
                 "loaded_from_file": False,
                 "measured_total": measured_total,
                 "corrected_total": corrected_total,
-                "n_spd_shots": len(spd_files),  # 【新增】用于参数面板显示
+                "n_spd_shots": len(spd_files),  # [new] shown on the parameter panel
                 "pos_R": pos_R, "pos_G": pos_G, "pos_B": pos_B
             }
 
@@ -1234,7 +1234,7 @@ class FSSA_GUI:
             log_text += f"SPD Correction Status: {spd_status}\n"
             log_text += ("SPD reliability: channels below 20% of peak response excluded\n"
                          "Spike rejection: isolated outliers only (5-point neighborhood, 4.5 MAD)\n")
-            # 【v1.4.8】通道与报告 Tab 3 的 "Channel" 行同源，避免主界面与报告口径不一致
+            # [v1.4.8] the channel comes from the same source as the report Tab 3 "Channel" row, so the main screen and the report cannot disagree
             fluor_label = ("Turbidity (Green channel)" if self.is_turbidity_mode
                            else fluorophore_display_name(self.current_fluorophore))
             log_text += f"Fluorophore: {fluor_label}\n"
@@ -1298,10 +1298,10 @@ class FSSA_GUI:
         row_frame = ttk.LabelFrame(self.std_rows_frame, text=f"Standard {len(self.std_rows) + 1}", padding=5)
         row_frame.pack(fill=tk.X, pady=5)
 
-        # 【修复】top_frame 必须 pack，否则 Conc 输入框与 X 删除按钮整行不可见
+        # [fix] top_frame must be packed, otherwise the Conc entry and the X delete button are invisible for the whole row
         top_frame = ttk.Frame(row_frame, style="Card.TFrame") if _THEME_ON else ttk.Frame(row_frame)
         top_frame.pack(fill=tk.X, pady=(0, 2))
-        top_frame.columnconfigure(1, weight=1)   # 浓度输入框等比拉伸，与整行对齐
+        top_frame.columnconfigure(1, weight=1)   # the concentration entry stretches proportionally and stays aligned with the whole row
         self._card_label(top_frame, "Conc:").grid(row=0, column=0, sticky="w")
         conc_var = tk.StringVar(value="0.0")
         ttk.Entry(top_frame, textvariable=conc_var).grid(row=0, column=1, sticky="we", padx=5)
@@ -1450,7 +1450,7 @@ class FSSA_GUI:
             self._style_fig(self.fig)
             self.fig.tight_layout()
             self.canvas_plot.draw()
-            # preset 路径不覆盖 step4 的溯源（由 load_curve_preset 写入），只补充预测浓度
+            # the preset path does not overwrite the Step 4 provenance (written by load_curve_preset); it only adds the predicted concentration
             entry = (self.preset_provenance or {}).get("step4")
             if isinstance(entry, dict) and entry.get("kind") == "preset":
                 entry.setdefault("params", {})["predicted_conc"] = f"{calc_result['sample_conc']:.6g}"
@@ -1731,20 +1731,20 @@ class FSSA_GUI:
             self.turbidity_window.win.lift(); self.turbidity_window.win.focus_force()
 
     def _auto_show_report(self):
-        """计算成功后自动弹出报告（由 root.after 异步调度）。
+        """Open the report automatically after a successful calculation (scheduled asynchronously via root.after).
 
-        ``DetailsWindow`` 在 ``__init__`` 里一次性渲染，没有 refresh 接口，所以
-        自动弹出必须强制重建：否则旧窗口只是被提到前台，报告里仍是上一次的
-        ``cache_step4`` 与上一次的溯源。
+        ``DetailsWindow`` renders once inside ``__init__`` and has no refresh API, so the automatic popup must
+        force a rebuild: otherwise the old window is merely raised to the front and the report still shows the
+        previous ``cache_step4`` and the previous provenance.
         """
         self.show_details_window(force_refresh=True)
 
     def show_details_window(self, force_refresh=False):
-        """打开报告窗口。
+        """Open the report window.
 
-        ``force_refresh=True``：自动弹出路径，先销毁存活的旧窗口再重建，保证用户
-        看到的是最新结果。``False``（工具栏「📋 Details」手动点击）：复用旧窗口，
-        只是把它提到前台，避免反复重建打断阅读。
+        ``force_refresh=True``: the automatic popup path - destroy any live old window before rebuilding so the user
+        always sees the newest result. ``False`` (manual click on the toolbar Details button): reuse the old window and
+        merely raise it to the front, avoiding repeated rebuilds that interrupt reading.
         """
         if not self.mapping:
             messagebox.showinfo("Info", "Please complete at least Step 1 to view details.")

@@ -5,7 +5,7 @@ from tkinter import ttk, filedialog, messagebox
 from pathlib import Path
 from typing import List
 
-# ---- 可选主题依赖（缺失时自动回退） ----
+# ---- optional theme dependency (falls back automatically when missing) ----
 try:
     from gui import theme as _theme
 except Exception:
@@ -25,13 +25,13 @@ _BTN_STYLES = {
 }
 
 def themed_button(master, text, kind="pale", **kw):
-    """创建按钮；主题开启时使用霓虹风格，否则保持原生 ttk 外观。"""
+    """Create a button; uses the neon style when the theme is on, otherwise keeps the native ttk appearance."""
     if _THEME_ON:
         kw.setdefault("style", _BTN_STYLES.get(kind, "Pale.TButton"))
     return ttk.Button(master, text=text, **kw)
 
 def themed_label(master, text, surface="dark", **kw):
-    """创建标签；surface='card' 用于奶油色卡片内部（黑字），'dark' 用于黑底（亮字）。"""
+    """Create a label; surface='card' for inside cream-coloured cards (dark text), 'dark' for dark backgrounds (light text)."""
     if _THEME_ON:
         kw.setdefault("style", "Card.TLabel" if surface == "card" else "TLabel")
         return ttk.Label(master, text=text, **kw)
@@ -41,10 +41,10 @@ def themed_label(master, text, surface="dark", **kw):
     return ttk.Label(master, text=text, **kw)
 
 class MultiFileSelector(ttk.Frame):
-    """多 DNG 文件选择组件（1-5 张），支持 dark / card 两种表面配色。"""
+    """Multi-DNG file picker (1-5 files), supporting both the dark and the card surface colours."""
     def __init__(self, master, title, max_files=5, surface="dark", **kwargs):
         if _THEME_ON and surface == "card":
-            kwargs.setdefault("style", "Card.TFrame")      # 卡片内容器用奶油底
+            kwargs.setdefault("style", "Card.TFrame")      # the inner container of a card uses the cream background
         super().__init__(master, **kwargs)
         self.max_files = max_files
         self.files = []
@@ -53,8 +53,8 @@ class MultiFileSelector(ttk.Frame):
 
         btn_frame = ttk.Frame(self, style=("Card.TFrame" if (_THEME_ON and surface == "card") else "TFrame"))
         btn_frame.pack(fill=tk.X, pady=2)
-        btn_frame.columnconfigure(0, weight=2)   # Add 占 2 份
-        btn_frame.columnconfigure(1, weight=1)   # Clear 占 1 份
+        btn_frame.columnconfigure(0, weight=2)   # Add takes 2 shares
+        btn_frame.columnconfigure(1, weight=1)   # Clear takes 1 share
         themed_button(btn_frame, f"Add (Max {max_files})", kind="yellow",
                       command=self.add_files).grid(row=0, column=0, sticky="we", padx=(0, 2))
         themed_button(btn_frame, "Clear", kind="pale",

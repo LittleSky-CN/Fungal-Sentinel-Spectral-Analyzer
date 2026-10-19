@@ -4,7 +4,7 @@ Aligned with Android SampleAnalyzer.kt logic. NumPy 1.x/2.x compatible.
 """
 import numpy as np
 
-# ---- NumPy 2.0+ 兼容垫片 ----
+# ---- NumPy 2.0+ compatibility shim ----
 if hasattr(np, "trapezoid"):
     np_trapz = np.trapezoid
 else:
@@ -22,12 +22,12 @@ def calculate_spectral_features(wavelengths: np.ndarray, intensity: np.ndarray, 
     if len(wls) == 0:
         return {"peak_wl": 0.0, "peak_intensity": 0.0, "fwhm": 0.0, "auc": 0.0, "centroid": 0.0}
 
-    # 确保波长递增（兼容负斜率映射）
+    # make sure wavelengths increase (compatible with negative-slope mappings)
     if wls[0] > wls[-1]:
         wls = wls[::-1]
         ints = ints[::-1]
 
-    # 1. Peak（初始 0.0：全负谱时保持 0，与 Kotlin 对齐）
+    # 1. Peak (initial 0.0: stays 0 for an all-negative spectrum, matching Kotlin)
     peak_intensity = 0.0
     peak_wl = 0.0
     peak_idx = 0
@@ -41,10 +41,10 @@ def calculate_spectral_features(wavelengths: np.ndarray, intensity: np.ndarray, 
     sum_i = float(np.sum(ints))
     centroid = float(np.sum(ints * wls) / sum_i) if sum_i > 0.0 else peak_wl
 
-    # 3. AUC（梯形积分，使用兼容垫片）
+    # 3. AUC (trapezoidal integration, using the compatibility shim)
     auc = float(np_trapz(ints, wls)) if len(wls) > 1 else 0.0
 
-    # 4. FWHM（crossing detection + 线性插值，右边界从峰后搜索）
+    # 4. FWHM (crossing detection + linear interpolation, the right boundary is searched after the peak)
     fwhm = 0.0
     if peak_intensity > 0.0:
         half = peak_intensity / 2.0

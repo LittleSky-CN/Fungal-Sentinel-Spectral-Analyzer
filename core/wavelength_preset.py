@@ -34,19 +34,19 @@ MIN_ABS_SLOPE = 1e-6
 QUALITIES = ("GOOD", "SUSPECT", "FAILED", "PRESET")
 
 # ---------------------------------------------------------------------------
-# Step 1 标定质量的 UI 分级 —— 两端词汇归一化
+# Step 1 calibration quality grading for the UI - the vocabulary of both ends is normalised
 #
-# 两套词汇并存，UI 必须等价对待：
-#   实时标定    core/image_processing._fit_from_peaks  -> PASS / WARNING / FAILED
+# Two vocabularies coexist and the UI must treat them as equivalent:
+#   live calibration    core/image_processing._fit_from_peaks  -> PASS / WARNING / FAILED
 #   WAVELENGTH preset  QUALITIES                       -> GOOD / SUSPECT / FAILED / PRESET
-# preset 侧词汇是野外已有 preset 文件的事实标准（存量文件里写的就是 GOOD/SUSPECT），
-# 不能改，所以这里做显式归一化，把两边都折到同一个三档分级上再决定颜色与文案。
+# the preset-side vocabulary is the de facto standard of presets already in the field (existing files literally say GOOD/SUSPECT),
+# so it cannot be changed. We therefore normalise explicitly and fold both onto the same three-level grading before deciding colour and wording.
 #
-# 阈值两端同一套：|G 点残差| <= 2.5 nm -> PASS，<= 10 nm -> WARNING，其余 -> FAILED
+# Thresholds are identical on both ends: |G-point residual| <= 2.5 nm -> PASS, <= 10 nm -> WARNING, otherwise -> FAILED
 # （core/image_processing.QUALITY_PASS_NM / QUALITY_WARNING_NM）。
 #
-# "PRESET" 表示质量标签继承自另一个 preset、本次无从校验，不能当成 PASS；
-# 未知或缺失的标签同样按 WARNING —— 宁可让用户看到橙色，也不要把"不知道"说成成功。
+# "PRESET" means the quality label was inherited from another preset and cannot be verified here; it must not be treated as PASS.
+# Unknown or missing labels are graded WARNING as well - better to show the user orange than to report "unknown" as success.
 # ---------------------------------------------------------------------------
 STEP1_TIERS = ("PASS", "WARNING", "FAILED")
 _QUALITY_TO_TIER = {
@@ -57,10 +57,10 @@ _QUALITY_TO_TIER = {
 
 
 def step1_quality_tier(quality) -> str:
-    """把任一端的 Step 1 质量标签归一化成 PASS / WARNING / FAILED。
+    """Normalise a Step 1 quality label from either end into PASS / WARNING / FAILED.
 
-    未知 / 缺失标签一律返回 ``"WARNING"``：这一层只服务于"能不能显示为成功"，
-    保守方向才是对的。
+        Unknown / missing labels always return ``"WARNING"``: this layer only answers "may this be shown as success",
+        so the conservative direction is the right one.
     """
     if isinstance(quality, str):
         tier = _QUALITY_TO_TIER.get(quality.strip().upper())

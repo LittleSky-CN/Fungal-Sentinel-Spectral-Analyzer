@@ -1,9 +1,9 @@
 # gui/details_window.py
 """FSSA v1.5.0 Detailed Analysis Report.
 
-【v1.5.0】新增 Fluorescein (sodium salt) 荧光素选项（发射 520 nm / 激发 494 nm / green
-通道 / FWHM 25）；荧光素标识统一为 canonical ID（新增 canonical_fluorophore() 归一化解
-析），以便与 Android 端曲线预设互通。
+[v1.5.0] Added the Fluorescein (sodium salt) fluorophore option (emission 520 nm / excitation 494 nm / green
+channel / FWHM 25); fluorophore identifiers are unified as canonical IDs (canonical_fluorophore() was added for
+normalised parsing) so curve presets interoperate with the Android app.
 Tab 2 fixed: Figure 4a-4d with ONE continuous pointwise-fused curve
 (weights response-proportional, sum = 1, no cross-wavelength smoothing).
 """
@@ -41,7 +41,7 @@ except Exception:
         (wB, wG, wR), (cB, cG, cR) = weights, curves
         return wB * cB + wG * cG + wR * cR
 
-# ---- 可选主题依赖 ----
+# ---- optional theme dependency ----
 try:
     from gui import theme as _theme
 except Exception:
@@ -114,7 +114,7 @@ class DetailsWindow:
         self.win.bind("<Button-4>", self._on_mousewheel)
         self.win.bind("<Button-5>", self._on_mousewheel)
 
-    # ---------------- 主题配色辅助 ----------------
+    # ---------------- theme colour helpers ----------------
     def _ink_line(self):
         return _theme.CREAM if _THEME_ON else "black"
 
@@ -133,7 +133,7 @@ class DetailsWindow:
                 "sample": "red", "sample_edge": "darkred",
                 "lod": "orange", "loq": "purple"}
 
-    # ---------------- 滚轮 & 滚动容器 ----------------
+    # ---------------- mouse wheel & scroll container ----------------
     def _set_active_canvas(self, canvas):
         self._active_canvas = canvas
 
@@ -194,16 +194,16 @@ class DetailsWindow:
         txt.config(state=tk.DISABLED)
         return txt
 
-    # 等宽字体字符步进（em，DejaVu Sans Mono 实测 ~0.59），取 0.62 留余量
+    # monospace character step (em, measured ~0.59 for DejaVu Sans Mono); 0.62 leaves headroom
     _MONO_CHAR_EM = 0.62
-    # 全角字符（CJK 等）在等宽字体里占两格
+    # full-width characters (CJK and similar) occupy two cells in a monospace font
     _WIDE_CHAR_CP = 0x2E80
 
     def _wrap_monospace(self, text, fontsize, x):
-        """按估算的列宽手工折行。
+        """Wrap manually according to the estimated column width.
 
-        ``fig.text`` 画等宽文本时不会自动折行，超宽的行会画到画布外、在 PDF 里
-        被裁掉右半截（窗口里的 ``tk.Text`` 是 ``wrap=tk.WORD``，不会）。
+        ``fig.text`` does not wrap monospace text automatically, so over-wide lines are drawn outside the canvas and
+        have their right half cut off in the PDF (the ``tk.Text`` widget in the window uses ``wrap=tk.WORD`` and does not).
         """
         usable_in = 15.0 * (1.0 - x - 0.03)
         width = max(24, int(usable_in * 72.0 / (fontsize * self._MONO_CHAR_EM)))
@@ -225,10 +225,10 @@ class DetailsWindow:
         return "\n".join(out)
 
     def _create_text_figure(self, title, params_text, fontsize=10, x=0.03):
-        """一整页纯文本（参数面板 / 预设溯源）的 figure。
+        """Figure for a full page of plain text (parameter panel / preset provenance).
 
-        画布高度随行数增长（原先只有溯源页这么做），否则行数一多就会画到画布
-        外面、PDF 里被裁掉底部。
+        The canvas height grows with the line count (previously only the provenance page did this); otherwise, once there
+        are many lines, the text is drawn outside the canvas and its bottom is cut off in the PDF.
         """
         wrapped = self._wrap_monospace(params_text, fontsize, x)
         n_lines = wrapped.count("\n") + 1
@@ -306,7 +306,7 @@ class DetailsWindow:
 
         quality = self.cache1.get("quality")
         tier = step1_quality_tier(quality)
-        # 这一段会渲染进报告 PDF 的参数图（等宽字体缺中文字形），所以只用英文
+        # this block is rendered into the parameter figure of the report PDF (monospace fonts lack CJK glyphs), so it stays English-only
         verdict = {
             "PASS": "usable",
             "WARNING": "biased - review downstream quantification",
@@ -362,7 +362,7 @@ class DetailsWindow:
         wv = wls[valid]
         rv, gv, bv = r_resp[valid], g_resp[valid], b_resp[valid]
 
-        # 【修复】校正分子 = 独立定位光源 Pos_c（而非标定灯 Lamp_c），避免循环论证
+        # [fix] the corrected numerator = the independently located lamp position Pos_c (not the calibration lamp Lamp_c), avoiding circular reasoning
         if pos_avail:
             cRv = _safe_div(pos_R, r_resp)[valid]
             cGv = _safe_div(pos_G, g_resp)[valid]
@@ -370,7 +370,7 @@ class DetailsWindow:
         else:
             cRv = cGv = cBv = None
 
-        # 交叉点仅作诊断读数输出；融合权重改用响应比例归一 w_c = resp_c / Σresp_c
+        # the crossing point is emitted only as a diagnostic reading; the fusion weight now uses response-proportional normalisation w_c = resp_c / sum(resp_c)
         h_bg, h_gr = auto_handoffs(wv, bv, gv, rv)
         wB, wG, wR = channel_weights(bv, gv, rv)
         fused = fuse_pointwise((wB, wG, wR), (cBv, cGv, cRv)) if pos_avail else None
@@ -432,7 +432,7 @@ class DetailsWindow:
         self.fig2.tight_layout()
         self._embed_figure(self.fig2, sc, inner)
 
-        # ---- 参数（含三通道一致性量化） ----
+        # ---- parameters (including the three-channel agreement metric) ----
         agree_txt = "n/a"
         fused_pk = fused_wl = float('nan')
         if pos_avail and fused is not None:
@@ -455,7 +455,7 @@ class DetailsWindow:
             f"[SPD Threshold Ratio] {self.cache2.get('spd_threshold_ratio', 0.05)}\n"
             f"[Shots Averaged] SPD lamp: {self.cache2.get('lamp_R_n', 1)} | Positioning: see Step 1\n"
             f"[Responsivity Crossings (diagnostic only)] B→G: {h_bg:.1f} nm | G→R: {h_gr:.1f} nm\n"
-            f"[Cross-channel Agreement] {agree_txt}   <- 三通道互相同意的量化证据\n"
+            f"[Cross-channel Agreement] {agree_txt}   <- quantified evidence that the three channels agree\n"
             f"[Fused Curve] peak {fused_pk:.4f} a.u./s @ {fused_wl:.1f} nm\n\n"
             f"[Per-channel Response Peaks (absolute)]\n"
             f"  R: {np.max(rv):.0f} a.u./SPD @ {wv[int(np.argmax(rv))]:.1f} nm\n"
@@ -603,14 +603,14 @@ class DetailsWindow:
         self._add_param_panel(tab, params)
         self.fig4_params = self._create_params_figure("Step 4: Concentration Parameters", params)
 
-    # ---------------- Tab 5: 预设溯源（无条件创建） ----------------
+    # ---------------- Tab 5: preset provenance (always created) ----------------
     STEP_TITLES = {1: "Wavelength Calibration",
                    2: "SPD Response Calibration",
                    3: "Sample Spectrum Analysis",
                    4: "Standard Curve / Concentration"}
 
     def _provenance_text(self):
-        """把 self.preset_provenance 渲染成纯文本；缺失的步骤也必须显式列出。"""
+        """Render self.preset_provenance as plain text; missing steps must be listed explicitly as well."""
         lines = [
             "[Preset Provenance - where the key parameters of each step came from]",
             "  Records, for Step 1-4, whether the key parameters were imported from a",

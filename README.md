@@ -168,22 +168,3 @@ figure is presented as measured data.
 Copyright 2026 CAU-China (iGEM Fungal Sentinel team). Apache-2.0 is OSI-approved and was
 chosen for its explicit patent grant and clean attribution on forks.
 
----
-
-## 中文摘要
-
-FSSA 是 Fungal Sentinel 项目的 Python 桌面参考实现：把手机 RAW（DNG）帧经固定
-狭缝–光栅–样品架后转成定标光谱，并进一步算出浓度，全流程离线。四步为
-波长标定 → 光谱响应（SPD）标定 → 扣空白积分 → 标准曲线回归。
-
-- **适用对象**：搭建低成本光栅荧光检测装置的 iGEM 队伍与教学实验室；手头已有 DNG
-  帧、需要可复现的像素↔波长映射与浓度结果的研究者；以及维护 Android 端 MycoSpec
-  的开发者（两端数值必须一致，FSSA 是对照基准）。**不适用于临床诊断。**
-- **安装运行**：Python ≥ 3.10（在 3.13.12 上验证）+ tkinter；
-  `pip install -r requirements.txt`（版本已锁定），然后 `python main.py`。
-- **复现主要结果**：10.15 数据集不随仓库分发，将存于 Zenodo（DOI 待发布）。参考值：
-  Step 1 映射 `p = −2.739832·λ + 3198.8985`，G 点残差 +5.57 nm（等级 WARNING）；
-  YPET 窗口净面积 B1=0.267636 / B2=0.293935 / B3=0.257038 / S=0.254361；
-  Step 4 R²（OLS）0.638。详见上文表格与 Limitations。
-- **AI 使用**：软件本身不调用任何 AI 模型；开发过程中使用过 AI 编码辅助。
-- **许可证**：Apache-2.0。仓库只含源码，无二进制、无数据集。
