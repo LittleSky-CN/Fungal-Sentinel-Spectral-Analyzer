@@ -8,7 +8,7 @@ version = "1.5.0"
 description = "FSSA (Fungal Sentinel Spectral Analyzer) - offline-first desktop pipeline for smartphone-DNG grating fluorescence spectroscopy"
 readme = "README.md"
 requires-python = ">=3.10"
-license = "MIT"
+license = "Apache-2.0"
 license-files = ["LICENSE"]
 keywords = ["spectroscopy", "fluorescence", "unmixing", "dng", "loD", "igem"]
 classifiers = [
@@ -25,13 +25,10 @@ dependencies = [
     "numpy>=1.24",
     "scipy>=1.10",
     "matplotlib>=3.7",
-    "opencv-python-headless>=4.8",
     "tifffile>=2023.7.10",
 ]
 
 [project.optional-dependencies]
-# opencv-python (GUI build) instead of the headless wheel
-gui = ["opencv-python>=4.8"]
 test = ["pytest>=7.4", "pypdf>=3.0"]
 
 [project.urls]
@@ -41,7 +38,7 @@ Android-counterpart = "https://github.com/LittleSky-CN/Mycospec"
 
 [tool.setuptools]
 # Explicit inventory: root-level modules plus the two code packages.
-# Avoids accidentally shipping tests/, assets/ or __pycache__ in the wheel.
+# Ships code plus runtime assets only; no __pycache__ in the wheel.
 py-modules = ["main", "config"]
 packages = ["core", "gui"]
 

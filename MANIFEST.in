@@ -12,8 +12,6 @@ recursive-include assets *.ico *.png *.ttf
 recursive-include core *.py
 recursive-include gui *.py
 
-# Keep tests out of the wheel, make them available to anyone auditing from source.
-prune tests/__pycache__
 prune */__pycache__
 prune .pytest_cache
 

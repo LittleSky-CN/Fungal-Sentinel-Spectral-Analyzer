@@ -1,14 +1,16 @@
-# FSSA v1.5.0 runtime dependencies.
+# FSSA v1.5.0 runtime dependencies — exact, tested versions (lockfile).
 #
-# These mirror the [project.dependencies] block in pyproject.toml so that a
-# plain `pip install -r requirements.txt` reproduces the same environment that
-# `pip install fssa` would create.
+# These are the versions the software was last run and verified with
+# (CPython 3.13.12, Windows, tkinter GUI). Install with:
+#     pip install -r requirements.txt
 #
 # tkinter ships with CPython on Windows/macOS; on Debian/Ubuntu install it with:
-#   sudo apt-get install python3-tk
+#     sudo apt-get install python3-tk
+#
+# Note: OpenCV (opencv-python-headless) was previously listed here but is not
+# imported anywhere in the code base, so it has been removed.
 
-numpy>=1.24
-scipy>=1.10
-matplotlib>=3.7
-opencv-python-headless>=4.8
-tifffile>=2023.7.10
+numpy==2.4.2
+scipy==1.17.0
+matplotlib==3.10.8
+tifffile==2026.7.31
