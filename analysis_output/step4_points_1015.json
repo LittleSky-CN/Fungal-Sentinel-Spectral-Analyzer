@@ -1,0 +1,2877 @@
+{
+  "dataset": "10.15",
+  "generated_by": "tools/diagnose_1015.py",
+  "data_dir": "D:\\Documents\\iGem\\Python\\FSSA_Documents\\10.15",
+  "blank_file": "B0.dng",
+  "step1": {
+    "k": -2.7398323295489404,
+    "b": 3198.8985485493968,
+    "quality": "WARNING",
+    "g_error_nm": 5.567346762826966,
+    "residual_px": 15.253596650602958,
+    "predicted_y_px": 1767.3361563600754,
+    "rb_swapped": false,
+    "x_roi": [
+      1900,
+      2212
+    ],
+    "peaks": [
+      {
+        "name": "R",
+        "y_centroid": 1493.3529234051812,
+        "estimator": "gauss",
+        "n_maxima": 1,
+        "quality": "good"
+      },
+      {
+        "name": "G",
+        "y_centroid": 1782.5897530106784,
+        "estimator": "gauss",
+        "n_maxima": 2,
+        "quality": "suspect"
+      },
+      {
+        "name": "B",
+        "y_centroid": 1931.7260961330117,
+        "estimator": "gauss",
+        "n_maxima": 2,
+        "quality": "suspect"
+      }
+    ],
+    "knowns": {
+      "R": 622.5,
+      "G": 522.5,
+      "B": 462.5
+    }
+  },
+  "step2": {
+    "on_site": true,
+    "grid_points": 401,
+    "masked_count": 229,
+    "effective_band": [
+      431.0,
+      659.0
+    ],
+    "spd_threshold_ratio": 0.1,
+    "valid_range": [
+      430.0,
+      660.0
+    ],
+    "valid_points": {
+      "r": 229,
+      "g": 229,
+      "b": 229
+    },
+    "spd_correction": "APPLIED (per-channel absolute)"
+  },
+  "step4_variants": [
+    {
+      "fluorophore": "YPET",
+      "metric_mode": "unmixing",
+      "std_set": "3pts_blank_not_a_point",
+      "regression_method": "ols",
+      "points": [
+        {
+          "concentration": 100.0,
+          "area": 0.27810946748936266
+        },
+        {
+          "concentration": 80.0,
+          "area": 0.29393162898799957
+        },
+        {
+          "concentration": 20.0,
+          "area": 0.25385891830266644
+        }
+      ],
+      "point_rows": [
+        {
+          "concentration": 100.0,
+          "file": "B1(100)",
+          "blank": "B0.dng",
+          "metric": 0.27810946748936266
+        },
+        {
+          "concentration": 80.0,
+          "file": "B2(80)",
+          "blank": "B0.dng",
+          "metric": 0.29393162898799957
+        },
+        {
+          "concentration": 20.0,
+          "file": "B3(20)",
+          "blank": "B0.dng",
+          "metric": 0.25385891830266644
+        }
+      ],
+      "sample": {
+        "file": "S.dng",
+        "blank": "B0.dng",
+        "metric": 0.2536987977211181
+      },
+      "python_fit": {
+        "slope": 0.0003873041678925911,
+        "intercept": 0.24947972706717014,
+        "r_value": 0.7989062968729956,
+        "r_squared": 0.638251271183323,
+        "sample_conc": 10.893429515372512,
+        "sample_mean_area": 0.2536987977211181,
+        "mode": "lod_iupac",
+        "regression_method": "ols",
+        "syx": 0.01716784863205269,
+        "lod_conc": 146.27753890189322,
+        "loq_conc": 443.2652693996764,
+        "lod_signal": 0.30613362755294404,
+        "loq_signal": 0.42115821338769704
+      },
+      "reference_fits": {
+        "ols_linear": {
+          "r_squared": 0.638251271183323,
+          "slope": 0.0003873041678925911,
+          "intercept": 0.24947972706717014,
+          "n": 3,
+          "x": "concentration",
+          "y": "area"
+        },
+        "log10x": {
+          "r_squared": 0.743506750108549,
+          "slope": 0.045957720179459094,
+          "intercept": 0.19557684161226538,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "area",
+          "note": "0 mg/L 点被剔除（log10(0) 无定义）"
+        },
+        "loglog": {
+          "r_squared": 0.7604818820392529,
+          "slope": 0.07402162712986221,
+          "intercept": -0.6893876362205826,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "log10(area)",
+          "note": "0 mg/L 与非正面积点均剔除"
+        }
+      },
+      "extra": {
+        "unmix_window": [
+          497.0,
+          617.0
+        ],
+        "scatter_peak_wl": 466.04988735190705,
+        "ref_standard": "B2(80) (C=80)",
+        "auc_E": 0.29393162898799335,
+        "alpha_sample": 0.8631218035112556,
+        "per_row_alpha": [
+          {
+            "conc": 100.0,
+            "name": "B1(100)",
+            "alpha": 0.9461706058884973,
+            "metric": 0.27810946748936266
+          },
+          {
+            "conc": 80.0,
+            "name": "B2(80)",
+            "alpha": 1.000000000000021,
+            "metric": 0.29393162898799957
+          },
+          {
+            "conc": 20.0,
+            "name": "B3(20)",
+            "alpha": 0.8636665580247446,
+            "metric": 0.25385891830266644
+          }
+        ]
+      }
+    },
+    {
+      "fluorophore": "YPET",
+      "metric_mode": "unmixing",
+      "std_set": "3pts_blank_not_a_point",
+      "regression_method": "weighted_1y2",
+      "points": [
+        {
+          "concentration": 100.0,
+          "area": 0.27810946748936266
+        },
+        {
+          "concentration": 80.0,
+          "area": 0.29393162898799957
+        },
+        {
+          "concentration": 20.0,
+          "area": 0.25385891830266644
+        }
+      ],
+      "point_rows": [
+        {
+          "concentration": 100.0,
+          "file": "B1(100)",
+          "blank": "B0.dng",
+          "metric": 0.27810946748936266
+        },
+        {
+          "concentration": 80.0,
+          "file": "B2(80)",
+          "blank": "B0.dng",
+          "metric": 0.29393162898799957
+        },
+        {
+          "concentration": 20.0,
+          "file": "B3(20)",
+          "blank": "B0.dng",
+          "metric": 0.25385891830266644
+        }
+      ],
+      "sample": {
+        "file": "S.dng",
+        "blank": "B0.dng",
+        "metric": 0.2536987977211181
+      },
+      "python_fit": {
+        "slope": 0.0003887100974267826,
+        "intercept": 0.24871734335192255,
+        "r_value": 0.8231424049442901,
+        "r_squared": 0.6775634188174697,
+        "sample_conc": 12.815345940772321,
+        "sample_mean_area": 0.2536987977211181,
+        "mode": "lod_iupac",
+        "regression_method": "weighted_1y2",
+        "syx": 0.05980032095587203,
+        "lod_conc": 507.6818442864064,
+        "loq_conc": 1538.4298311709285,
+        "lod_signal": 0.44605840250630024,
+        "loq_signal": 0.8467205529106429
+      },
+      "reference_fits": {
+        "ols_linear": {
+          "r_squared": 0.638251271183323,
+          "slope": 0.0003873041678925911,
+          "intercept": 0.24947972706717014,
+          "n": 3,
+          "x": "concentration",
+          "y": "area"
+        },
+        "log10x": {
+          "r_squared": 0.743506750108549,
+          "slope": 0.045957720179459094,
+          "intercept": 0.19557684161226538,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "area",
+          "note": "0 mg/L 点被剔除（log10(0) 无定义）"
+        },
+        "loglog": {
+          "r_squared": 0.7604818820392529,
+          "slope": 0.07402162712986221,
+          "intercept": -0.6893876362205826,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "log10(area)",
+          "note": "0 mg/L 与非正面积点均剔除"
+        }
+      },
+      "extra": {
+        "unmix_window": [
+          497.0,
+          617.0
+        ],
+        "scatter_peak_wl": 466.04988735190705,
+        "ref_standard": "B2(80) (C=80)",
+        "auc_E": 0.29393162898799335,
+        "alpha_sample": 0.8631218035112556,
+        "per_row_alpha": [
+          {
+            "conc": 100.0,
+            "name": "B1(100)",
+            "alpha": 0.9461706058884973,
+            "metric": 0.27810946748936266
+          },
+          {
+            "conc": 80.0,
+            "name": "B2(80)",
+            "alpha": 1.000000000000021,
+            "metric": 0.29393162898799957
+          },
+          {
+            "conc": 20.0,
+            "name": "B3(20)",
+            "alpha": 0.8636665580247446,
+            "metric": 0.25385891830266644
+          }
+        ]
+      }
+    },
+    {
+      "fluorophore": "YPET",
+      "metric_mode": "unmixing",
+      "std_set": "4pts_blank_as_zero",
+      "regression_method": "ols",
+      "points": [
+        {
+          "concentration": 0.0,
+          "area": 6.275333574940487e-15
+        },
+        {
+          "concentration": 100.0,
+          "area": 0.27810946748936266
+        },
+        {
+          "concentration": 80.0,
+          "area": 0.29393162898799957
+        },
+        {
+          "concentration": 20.0,
+          "area": 0.25385891830266644
+        }
+      ],
+      "point_rows": [
+        {
+          "concentration": 0.0,
+          "file": "B0(blank)",
+          "blank": "B0.dng",
+          "metric": 6.275333574940487e-15
+        },
+        {
+          "concentration": 100.0,
+          "file": "B1(100)",
+          "blank": "B0.dng",
+          "metric": 0.27810946748936266
+        },
+        {
+          "concentration": 80.0,
+          "file": "B2(80)",
+          "blank": "B0.dng",
+          "metric": 0.29393162898799957
+        },
+        {
+          "concentration": 20.0,
+          "file": "B3(20)",
+          "blank": "B0.dng",
+          "metric": 0.25385891830266644
+        }
+      ],
+      "sample": {
+        "file": "S.dng",
+        "blank": "B0.dng",
+        "metric": 0.2536987977211181
+      },
+      "python_fit": {
+        "slope": 0.0022217139257393846,
+        "intercept": 0.09538930740803953,
+        "r_value": 0.7629838875856765,
+        "r_squared": 0.5821444127153522,
+        "sample_conc": 71.25556917072178,
+        "sample_mean_area": 0.2536987977211181,
+        "mode": "lod_iupac",
+        "regression_method": "ols",
+        "syx": 0.10975525819735243,
+        "lod_conc": 163.02384742478745,
+        "loq_conc": 494.0116588629923,
+        "lod_signal": 0.4575816594593025,
+        "loq_signal": 1.1929418893815638
+      },
+      "reference_fits": {
+        "ols_linear": {
+          "r_squared": 0.5821444127153522,
+          "slope": 0.0022217139257393846,
+          "intercept": 0.09538930740803953,
+          "n": 4,
+          "x": "concentration",
+          "y": "area"
+        },
+        "log10x": {
+          "r_squared": 0.743506750108549,
+          "slope": 0.045957720179459094,
+          "intercept": 0.19557684161226538,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "area",
+          "note": "0 mg/L 点被剔除（log10(0) 无定义）"
+        },
+        "loglog": {
+          "r_squared": 0.7604818820392529,
+          "slope": 0.07402162712986221,
+          "intercept": -0.6893876362205826,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "log10(area)",
+          "note": "0 mg/L 与非正面积点均剔除"
+        },
+        "log10_conc_plus_1": {
+          "r_squared": 0.9445868576749258,
+          "slope": 0.14595684299153872,
+          "intercept": 0.015453048117055002,
+          "n": 4,
+          "x": "log10(concentration + 1)",
+          "y": "area",
+          "note": "保留 0 mg/L 点的另一种处理方式（+1 平移）"
+        }
+      },
+      "extra": {
+        "unmix_window": [
+          497.0,
+          617.0
+        ],
+        "scatter_peak_wl": 466.04988735190705,
+        "ref_standard": "B2(80) (C=80)",
+        "auc_E": 0.29393162898799335,
+        "alpha_sample": 0.8631218035112556,
+        "per_row_alpha": [
+          {
+            "conc": 0.0,
+            "name": "B0(blank)",
+            "alpha": 2.1349636976961145e-14,
+            "metric": 6.275333574940487e-15
+          },
+          {
+            "conc": 100.0,
+            "name": "B1(100)",
+            "alpha": 0.9461706058884973,
+            "metric": 0.27810946748936266
+          },
+          {
+            "conc": 80.0,
+            "name": "B2(80)",
+            "alpha": 1.000000000000021,
+            "metric": 0.29393162898799957
+          },
+          {
+            "conc": 20.0,
+            "name": "B3(20)",
+            "alpha": 0.8636665580247446,
+            "metric": 0.25385891830266644
+          }
+        ]
+      }
+    },
+    {
+      "fluorophore": "YPET",
+      "metric_mode": "unmixing",
+      "std_set": "4pts_blank_as_zero",
+      "regression_method": "weighted_1y2",
+      "points": [
+        {
+          "concentration": 0.0,
+          "area": 6.275333574940487e-15
+        },
+        {
+          "concentration": 100.0,
+          "area": 0.27810946748936266
+        },
+        {
+          "concentration": 80.0,
+          "area": 0.29393162898799957
+        },
+        {
+          "concentration": 20.0,
+          "area": 0.25385891830266644
+        }
+      ],
+      "point_rows": [
+        {
+          "concentration": 0.0,
+          "file": "B0(blank)",
+          "blank": "B0.dng",
+          "metric": 6.275333574940487e-15
+        },
+        {
+          "concentration": 100.0,
+          "file": "B1(100)",
+          "blank": "B0.dng",
+          "metric": 0.27810946748936266
+        },
+        {
+          "concentration": 80.0,
+          "file": "B2(80)",
+          "blank": "B0.dng",
+          "metric": 0.29393162898799957
+        },
+        {
+          "concentration": 20.0,
+          "file": "B3(20)",
+          "blank": "B0.dng",
+          "metric": 0.25385891830266644
+        }
+      ],
+      "sample": {
+        "file": "S.dng",
+        "blank": "B0.dng",
+        "metric": 0.2536987977211181
+      },
+      "python_fit": {
+        "slope": 0.003390311712201335,
+        "intercept": 6.275333574940581e-15,
+        "r_value": 0.8960853730593265,
+        "r_squared": 0.8029689958108723,
+        "sample_conc": 74.83052275343283,
+        "sample_mean_area": 0.2536987977211181,
+        "mode": "lod_iupac",
+        "regression_method": "weighted_1y2",
+        "syx": 0.5436418915827569,
+        "lod_conc": 529.1602644578775,
+        "loq_conc": 1603.5159529026591,
+        "lod_signal": 1.794018242223104,
+        "loq_signal": 5.436418915827575
+      },
+      "reference_fits": {
+        "ols_linear": {
+          "r_squared": 0.5821444127153522,
+          "slope": 0.0022217139257393846,
+          "intercept": 0.09538930740803953,
+          "n": 4,
+          "x": "concentration",
+          "y": "area"
+        },
+        "log10x": {
+          "r_squared": 0.743506750108549,
+          "slope": 0.045957720179459094,
+          "intercept": 0.19557684161226538,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "area",
+          "note": "0 mg/L 点被剔除（log10(0) 无定义）"
+        },
+        "loglog": {
+          "r_squared": 0.7604818820392529,
+          "slope": 0.07402162712986221,
+          "intercept": -0.6893876362205826,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "log10(area)",
+          "note": "0 mg/L 与非正面积点均剔除"
+        },
+        "log10_conc_plus_1": {
+          "r_squared": 0.9445868576749258,
+          "slope": 0.14595684299153872,
+          "intercept": 0.015453048117055002,
+          "n": 4,
+          "x": "log10(concentration + 1)",
+          "y": "area",
+          "note": "保留 0 mg/L 点的另一种处理方式（+1 平移）"
+        }
+      },
+      "extra": {
+        "unmix_window": [
+          497.0,
+          617.0
+        ],
+        "scatter_peak_wl": 466.04988735190705,
+        "ref_standard": "B2(80) (C=80)",
+        "auc_E": 0.29393162898799335,
+        "alpha_sample": 0.8631218035112556,
+        "per_row_alpha": [
+          {
+            "conc": 0.0,
+            "name": "B0(blank)",
+            "alpha": 2.1349636976961145e-14,
+            "metric": 6.275333574940487e-15
+          },
+          {
+            "conc": 100.0,
+            "name": "B1(100)",
+            "alpha": 0.9461706058884973,
+            "metric": 0.27810946748936266
+          },
+          {
+            "conc": 80.0,
+            "name": "B2(80)",
+            "alpha": 1.000000000000021,
+            "metric": 0.29393162898799957
+          },
+          {
+            "conc": 20.0,
+            "name": "B3(20)",
+            "alpha": 0.8636665580247446,
+            "metric": 0.25385891830266644
+          }
+        ]
+      }
+    },
+    {
+      "fluorophore": "YPET",
+      "metric_mode": "legacy",
+      "std_set": "3pts_blank_not_a_point",
+      "regression_method": "ols",
+      "points": [
+        {
+          "concentration": 100.0,
+          "area": 0.26763585515541327
+        },
+        {
+          "concentration": 80.0,
+          "area": 0.29393462117979424
+        },
+        {
+          "concentration": 20.0,
+          "area": 0.25703764859631134
+        }
+      ],
+      "point_rows": [
+        {
+          "concentration": 100.0,
+          "file": "B1(100)",
+          "blank": "B0.dng",
+          "metric": 0.26763585515541327
+        },
+        {
+          "concentration": 80.0,
+          "file": "B2(80)",
+          "blank": "B0.dng",
+          "metric": 0.29393462117979424
+        },
+        {
+          "concentration": 20.0,
+          "file": "B3(20)",
+          "blank": "B0.dng",
+          "metric": 0.25703764859631134
+        }
+      ],
+      "sample": {
+        "file": "S.dng",
+        "blank": "B0.dng",
+        "metric": 0.25436090031329484
+      },
+      "python_fit": {
+        "slope": 0.00024381726531245277,
+        "intercept": 0.25661489062300946,
+        "r_value": 0.5343412618794405,
+        "r_squared": 0.28552058414691284,
+        "sample_conc": -9.244588593125794,
+        "sample_mean_area": 0.25436090031329484,
+        "mode": "lod_iupac",
+        "regression_method": "ols",
+        "syx": 0.022708928716187127,
+        "lod_conc": 307.3591390969885,
+        "loq_conc": 931.3913305969348,
+        "lod_signal": 0.33155435538642697,
+        "loq_signal": 0.48370417778488073
+      },
+      "reference_fits": {
+        "ols_linear": {
+          "r_squared": 0.28552058414691284,
+          "slope": 0.00024381726531245277,
+          "intercept": 0.25661489062300946,
+          "n": 3,
+          "x": "concentration",
+          "y": "area"
+        },
+        "log10x": {
+          "r_squared": 0.39341145491702983,
+          "slope": 0.031465087005815164,
+          "intercept": 0.21828667896284962,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "area",
+          "note": "0 mg/L 点被剔除（log10(0) 无定义）"
+        },
+        "loglog": {
+          "r_squared": 0.4083950916279784,
+          "slope": 0.05043166345365503,
+          "intercept": -0.6522202166513908,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "log10(area)",
+          "note": "0 mg/L 与非正面积点均剔除"
+        }
+      },
+      "extra": {
+        "integration_window": [
+          517.1479047342511,
+          536.8571400102982
+        ]
+      }
+    },
+    {
+      "fluorophore": "YPET",
+      "metric_mode": "legacy",
+      "std_set": "3pts_blank_not_a_point",
+      "regression_method": "weighted_1y2",
+      "points": [
+        {
+          "concentration": 100.0,
+          "area": 0.26763585515541327
+        },
+        {
+          "concentration": 80.0,
+          "area": 0.29393462117979424
+        },
+        {
+          "concentration": 20.0,
+          "area": 0.25703764859631134
+        }
+      ],
+      "point_rows": [
+        {
+          "concentration": 100.0,
+          "file": "B1(100)",
+          "blank": "B0.dng",
+          "metric": 0.26763585515541327
+        },
+        {
+          "concentration": 80.0,
+          "file": "B2(80)",
+          "blank": "B0.dng",
+          "metric": 0.29393462117979424
+        },
+        {
+          "concentration": 20.0,
+          "file": "B3(20)",
+          "blank": "B0.dng",
+          "metric": 0.25703764859631134
+        }
+      ],
+      "sample": {
+        "file": "S.dng",
+        "blank": "B0.dng",
+        "metric": 0.25436090031329484
+      },
+      "python_fit": {
+        "slope": 0.00023538871885707624,
+        "intercept": 0.25598488716057116,
+        "r_value": 0.5507906622142367,
+        "r_squared": 0.3033703535823974,
+        "sample_conc": -6.899170254044255,
+        "sample_mean_area": 0.25436090031329484,
+        "mode": "lod_iupac",
+        "regression_method": "weighted_1y2",
+        "syx": 0.0800367380613561,
+        "lod_conc": 1122.0641196609115,
+        "loq_conc": 3400.194302002763,
+        "lod_signal": 0.5201061227630462,
+        "loq_signal": 1.0563522677741322
+      },
+      "reference_fits": {
+        "ols_linear": {
+          "r_squared": 0.28552058414691284,
+          "slope": 0.00024381726531245277,
+          "intercept": 0.25661489062300946,
+          "n": 3,
+          "x": "concentration",
+          "y": "area"
+        },
+        "log10x": {
+          "r_squared": 0.39341145491702983,
+          "slope": 0.031465087005815164,
+          "intercept": 0.21828667896284962,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "area",
+          "note": "0 mg/L 点被剔除（log10(0) 无定义）"
+        },
+        "loglog": {
+          "r_squared": 0.4083950916279784,
+          "slope": 0.05043166345365503,
+          "intercept": -0.6522202166513908,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "log10(area)",
+          "note": "0 mg/L 与非正面积点均剔除"
+        }
+      },
+      "extra": {
+        "integration_window": [
+          517.1479047342511,
+          536.8571400102982
+        ]
+      }
+    },
+    {
+      "fluorophore": "YPET",
+      "metric_mode": "legacy",
+      "std_set": "4pts_blank_as_zero",
+      "regression_method": "ols",
+      "points": [
+        {
+          "concentration": 0.0,
+          "area": 1.0344433311301556e-05
+        },
+        {
+          "concentration": 100.0,
+          "area": 0.26763585515541327
+        },
+        {
+          "concentration": 80.0,
+          "area": 0.29393462117979424
+        },
+        {
+          "concentration": 20.0,
+          "area": 0.25703764859631134
+        }
+      ],
+      "point_rows": [
+        {
+          "concentration": 0.0,
+          "file": "B0(blank)",
+          "blank": "B0.dng",
+          "metric": 1.0344433311301556e-05
+        },
+        {
+          "concentration": 100.0,
+          "file": "B1(100)",
+          "blank": "B0.dng",
+          "metric": 0.26763585515541327
+        },
+        {
+          "concentration": 80.0,
+          "file": "B2(80)",
+          "blank": "B0.dng",
+          "metric": 0.29393462117979424
+        },
+        {
+          "concentration": 20.0,
+          "file": "B3(20)",
+          "blank": "B0.dng",
+          "metric": 0.25703764859631134
+        }
+      ],
+      "sample": {
+        "file": "S.dng",
+        "blank": "B0.dng",
+        "metric": 0.25436090031329484
+      },
+      "python_fit": {
+        "slope": 0.0021306153990602334,
+        "intercept": 0.09812384738819588,
+        "r_value": 0.7387571301120163,
+        "r_squared": 0.5457620972913425,
+        "sample_conc": 73.32954271991633,
+        "sample_mean_area": 0.25436090031329484,
+        "mode": "lod_iupac",
+        "regression_method": "ols",
+        "syx": 0.11334034220933126,
+        "lod_conc": 175.54699428895816,
+        "loq_conc": 531.9605887544188,
+        "lod_signal": 0.47214697667898897,
+        "loq_signal": 1.2315272694815087
+      },
+      "reference_fits": {
+        "ols_linear": {
+          "r_squared": 0.5457620972913425,
+          "slope": 0.0021306153990602334,
+          "intercept": 0.09812384738819588,
+          "n": 4,
+          "x": "concentration",
+          "y": "area"
+        },
+        "log10x": {
+          "r_squared": 0.39341145491702983,
+          "slope": 0.031465087005815164,
+          "intercept": 0.21828667896284962,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "area",
+          "note": "0 mg/L 点被剔除（log10(0) 无定义）"
+        },
+        "loglog": {
+          "r_squared": 0.4083950916279784,
+          "slope": 0.05043166345365503,
+          "intercept": -0.6522202166513908,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "log10(area)",
+          "note": "0 mg/L 与非正面积点均剔除"
+        },
+        "log10_conc_plus_1": {
+          "r_squared": 0.9258243474213235,
+          "slope": 0.14311937012578832,
+          "intercept": 0.01734622259812635,
+          "n": 4,
+          "x": "log10(concentration + 1)",
+          "y": "area",
+          "note": "保留 0 mg/L 点的另一种处理方式（+1 平移）"
+        }
+      },
+      "extra": {
+        "integration_window": [
+          517.1479047342511,
+          536.8571400102982
+        ]
+      }
+    },
+    {
+      "fluorophore": "YPET",
+      "metric_mode": "legacy",
+      "std_set": "4pts_blank_as_zero",
+      "regression_method": "weighted_1y2",
+      "points": [
+        {
+          "concentration": 0.0,
+          "area": 1.0344433311301556e-05
+        },
+        {
+          "concentration": 100.0,
+          "area": 0.26763585515541327
+        },
+        {
+          "concentration": 80.0,
+          "area": 0.29393462117979424
+        },
+        {
+          "concentration": 20.0,
+          "area": 0.25703764859631134
+        }
+      ],
+      "point_rows": [
+        {
+          "concentration": 0.0,
+          "file": "B0(blank)",
+          "blank": "B0.dng",
+          "metric": 1.0344433311301556e-05
+        },
+        {
+          "concentration": 100.0,
+          "file": "B1(100)",
+          "blank": "B0.dng",
+          "metric": 0.26763585515541327
+        },
+        {
+          "concentration": 80.0,
+          "file": "B2(80)",
+          "blank": "B0.dng",
+          "metric": 0.29393462117979424
+        },
+        {
+          "concentration": 20.0,
+          "file": "B3(20)",
+          "blank": "B0.dng",
+          "metric": 0.25703764859631134
+        }
+      ],
+      "sample": {
+        "file": "S.dng",
+        "blank": "B0.dng",
+        "metric": 0.25436090031329484
+      },
+      "python_fit": {
+        "slope": 0.0032929717480199043,
+        "intercept": 1.0344688562413714e-05,
+        "r_value": 0.8912454443713185,
+        "r_squared": 0.7943184421126289,
+        "sample_conc": 77.24043055567539,
+        "sample_mean_area": 0.25436090031329484,
+        "mode": "lod_iupac",
+        "regression_method": "weighted_1y2",
+        "syx": 0.555426745799288,
+        "lod_conc": 556.6122036242174,
+        "loq_conc": 1686.7036473461135,
+        "lod_signal": 1.8329186058262124,
+        "loq_signal": 5.554277802681442
+      },
+      "reference_fits": {
+        "ols_linear": {
+          "r_squared": 0.5457620972913425,
+          "slope": 0.0021306153990602334,
+          "intercept": 0.09812384738819588,
+          "n": 4,
+          "x": "concentration",
+          "y": "area"
+        },
+        "log10x": {
+          "r_squared": 0.39341145491702983,
+          "slope": 0.031465087005815164,
+          "intercept": 0.21828667896284962,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "area",
+          "note": "0 mg/L 点被剔除（log10(0) 无定义）"
+        },
+        "loglog": {
+          "r_squared": 0.4083950916279784,
+          "slope": 0.05043166345365503,
+          "intercept": -0.6522202166513908,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "log10(area)",
+          "note": "0 mg/L 与非正面积点均剔除"
+        },
+        "log10_conc_plus_1": {
+          "r_squared": 0.9258243474213235,
+          "slope": 0.14311937012578832,
+          "intercept": 0.01734622259812635,
+          "n": 4,
+          "x": "log10(concentration + 1)",
+          "y": "area",
+          "note": "保留 0 mg/L 点的另一种处理方式（+1 平移）"
+        }
+      },
+      "extra": {
+        "integration_window": [
+          517.1479047342511,
+          536.8571400102982
+        ]
+      }
+    },
+    {
+      "fluorophore": "FLUORESCEIN",
+      "metric_mode": "unmixing",
+      "std_set": "3pts_blank_not_a_point",
+      "regression_method": "ols",
+      "points": [
+        {
+          "concentration": 100.0,
+          "area": 0.3231809300232042
+        },
+        {
+          "concentration": 80.0,
+          "area": 0.3563197015889644
+        },
+        {
+          "concentration": 20.0,
+          "area": 0.31024254317149474
+        }
+      ],
+      "point_rows": [
+        {
+          "concentration": 100.0,
+          "file": "B1(100)",
+          "blank": "B0.dng",
+          "metric": 0.3231809300232042
+        },
+        {
+          "concentration": 80.0,
+          "file": "B2(80)",
+          "blank": "B0.dng",
+          "metric": 0.3563197015889644
+        },
+        {
+          "concentration": 20.0,
+          "file": "B3(20)",
+          "blank": "B0.dng",
+          "metric": 0.31024254317149474
+        }
+      ],
+      "sample": {
+        "file": "S.dng",
+        "blank": "B0.dng",
+        "metric": 0.3088709918934088
+      },
+      "python_fit": {
+        "slope": 0.00030162740594901274,
+        "intercept": 0.30980589786462026,
+        "r_value": 0.5284110569750334,
+        "r_squared": 0.27921824513347204,
+        "sample_conc": -3.0995392088791927,
+        "sample_mean_area": 0.3088709918934088,
+        "mode": "lod_iupac",
+        "regression_method": "ols",
+        "syx": 0.028533617635096115,
+        "lod_conc": 312.176335235712,
+        "loq_conc": 945.9888946536726,
+        "lod_signal": 0.40396683606043743,
+        "loq_signal": 0.5951420742155814
+      },
+      "reference_fits": {
+        "ols_linear": {
+          "r_squared": 0.27921824513347204,
+          "slope": 0.00030162740594901274,
+          "intercept": 0.30980589786462026,
+          "n": 3,
+          "x": "concentration",
+          "y": "area"
+        },
+        "log10x": {
+          "r_squared": 0.38658270756609975,
+          "slope": 0.03901932988106438,
+          "intercept": 0.2622273001465909,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "area",
+          "note": "0 mg/L 点被剔除（log10(0) 无定义）"
+        },
+        "loglog": {
+          "r_squared": 0.40176461549022446,
+          "slope": 0.05172008180716232,
+          "intercept": -0.5720568656833295,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "log10(area)",
+          "note": "0 mg/L 与非正面积点均剔除"
+        }
+      },
+      "extra": {
+        "unmix_window": [
+          490.0,
+          610.0
+        ],
+        "scatter_peak_wl": 466.04988735190705,
+        "ref_standard": "B2(80) (C=80)",
+        "auc_E": 0.35631970158897136,
+        "alpha_sample": 0.8668366933291369,
+        "per_row_alpha": [
+          {
+            "conc": 100.0,
+            "name": "B1(100)",
+            "alpha": 0.9069970831868454,
+            "metric": 0.3231809300232042
+          },
+          {
+            "conc": 80.0,
+            "name": "B2(80)",
+            "alpha": 0.9999999999999806,
+            "metric": 0.3563197015889644
+          },
+          {
+            "conc": 20.0,
+            "name": "B3(20)",
+            "alpha": 0.870685908716245,
+            "metric": 0.31024254317149474
+          }
+        ]
+      }
+    },
+    {
+      "fluorophore": "FLUORESCEIN",
+      "metric_mode": "unmixing",
+      "std_set": "3pts_blank_not_a_point",
+      "regression_method": "weighted_1y2",
+      "points": [
+        {
+          "concentration": 100.0,
+          "area": 0.3231809300232042
+        },
+        {
+          "concentration": 80.0,
+          "area": 0.3563197015889644
+        },
+        {
+          "concentration": 20.0,
+          "area": 0.31024254317149474
+        }
+      ],
+      "point_rows": [
+        {
+          "concentration": 100.0,
+          "file": "B1(100)",
+          "blank": "B0.dng",
+          "metric": 0.3231809300232042
+        },
+        {
+          "concentration": 80.0,
+          "file": "B2(80)",
+          "blank": "B0.dng",
+          "metric": 0.3563197015889644
+        },
+        {
+          "concentration": 20.0,
+          "file": "B3(20)",
+          "blank": "B0.dng",
+          "metric": 0.31024254317149474
+        }
+      ],
+      "sample": {
+        "file": "S.dng",
+        "blank": "B0.dng",
+        "metric": 0.3088709918934088
+      },
+      "python_fit": {
+        "slope": 0.00029042950304419856,
+        "intercept": 0.3089988995676574,
+        "r_value": 0.5448133275020652,
+        "r_squared": 0.29682156182387254,
+        "sample_conc": -0.4404086806193865,
+        "sample_mean_area": 0.3088709918934088,
+        "mode": "lod_iupac",
+        "regression_method": "weighted_1y2",
+        "syx": 0.08306885948689535,
+        "lod_conc": 943.8684205062908,
+        "loq_conc": 2860.2073348675476,
+        "lod_signal": 0.5831261358744121,
+        "loq_signal": 1.1396874944366109
+      },
+      "reference_fits": {
+        "ols_linear": {
+          "r_squared": 0.27921824513347204,
+          "slope": 0.00030162740594901274,
+          "intercept": 0.30980589786462026,
+          "n": 3,
+          "x": "concentration",
+          "y": "area"
+        },
+        "log10x": {
+          "r_squared": 0.38658270756609975,
+          "slope": 0.03901932988106438,
+          "intercept": 0.2622273001465909,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "area",
+          "note": "0 mg/L 点被剔除（log10(0) 无定义）"
+        },
+        "loglog": {
+          "r_squared": 0.40176461549022446,
+          "slope": 0.05172008180716232,
+          "intercept": -0.5720568656833295,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "log10(area)",
+          "note": "0 mg/L 与非正面积点均剔除"
+        }
+      },
+      "extra": {
+        "unmix_window": [
+          490.0,
+          610.0
+        ],
+        "scatter_peak_wl": 466.04988735190705,
+        "ref_standard": "B2(80) (C=80)",
+        "auc_E": 0.35631970158897136,
+        "alpha_sample": 0.8668366933291369,
+        "per_row_alpha": [
+          {
+            "conc": 100.0,
+            "name": "B1(100)",
+            "alpha": 0.9069970831868454,
+            "metric": 0.3231809300232042
+          },
+          {
+            "conc": 80.0,
+            "name": "B2(80)",
+            "alpha": 0.9999999999999806,
+            "metric": 0.3563197015889644
+          },
+          {
+            "conc": 20.0,
+            "name": "B3(20)",
+            "alpha": 0.870685908716245,
+            "metric": 0.31024254317149474
+          }
+        ]
+      }
+    },
+    {
+      "fluorophore": "FLUORESCEIN",
+      "metric_mode": "unmixing",
+      "std_set": "4pts_blank_as_zero",
+      "regression_method": "ols",
+      "points": [
+        {
+          "concentration": 0.0,
+          "area": -6.939013094347185e-15
+        },
+        {
+          "concentration": 100.0,
+          "area": 0.3231809300232042
+        },
+        {
+          "concentration": 80.0,
+          "area": 0.3563197015889644
+        },
+        {
+          "concentration": 20.0,
+          "area": 0.31024254317149474
+        }
+      ],
+      "point_rows": [
+        {
+          "concentration": 0.0,
+          "file": "B0(blank)",
+          "blank": "B0.dng",
+          "metric": -6.939013094347185e-15
+        },
+        {
+          "concentration": 100.0,
+          "file": "B1(100)",
+          "blank": "B0.dng",
+          "metric": 0.3231809300232042
+        },
+        {
+          "concentration": 80.0,
+          "file": "B2(80)",
+          "blank": "B0.dng",
+          "metric": 0.3563197015889644
+        },
+        {
+          "concentration": 20.0,
+          "file": "B3(20)",
+          "blank": "B0.dng",
+          "metric": 0.31024254317149474
+        }
+      ],
+      "sample": {
+        "file": "S.dng",
+        "blank": "B0.dng",
+        "metric": 0.3088709918934088
+      },
+      "python_fit": {
+        "slope": 0.0025796119490712715,
+        "intercept": 0.11845519624235054,
+        "r_value": 0.7394228155630882,
+        "r_squared": 0.5467461001752447,
+        "sample_conc": 73.81567437676544,
+        "sample_mean_area": 0.3088709918934088,
+        "mode": "lod_iupac",
+        "regression_method": "ols",
+        "syx": 0.13695306817289646,
+        "lod_conc": 175.19888025533083,
+        "loq_conc": 530.9056977434268,
+        "lod_signal": 0.5704003212129088,
+        "loq_signal": 1.487985877971315
+      },
+      "reference_fits": {
+        "ols_linear": {
+          "r_squared": 0.5467461001752447,
+          "slope": 0.0025796119490712715,
+          "intercept": 0.11845519624235054,
+          "n": 4,
+          "x": "concentration",
+          "y": "area"
+        },
+        "log10x": {
+          "r_squared": 0.38658270756609975,
+          "slope": 0.03901932988106438,
+          "intercept": 0.2622273001465909,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "area",
+          "note": "0 mg/L 点被剔除（log10(0) 无定义）"
+        },
+        "loglog": {
+          "r_squared": 0.40176461549022446,
+          "slope": 0.05172008180716232,
+          "intercept": -0.5720568656833295,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "log10(area)",
+          "note": "0 mg/L 与非正面积点均剔除"
+        },
+        "log10_conc_plus_1": {
+          "r_squared": 0.9261287183098326,
+          "slope": 0.17315217452506435,
+          "intercept": 0.020821773329151444,
+          "n": 4,
+          "x": "log10(concentration + 1)",
+          "y": "area",
+          "note": "保留 0 mg/L 点的另一种处理方式（+1 平移）"
+        }
+      },
+      "extra": {
+        "unmix_window": [
+          490.0,
+          610.0
+        ],
+        "scatter_peak_wl": 466.04988735190705,
+        "ref_standard": "B2(80) (C=80)",
+        "auc_E": 0.35631970158897136,
+        "alpha_sample": 0.8668366933291369,
+        "per_row_alpha": [
+          {
+            "conc": 0.0,
+            "name": "B0(blank)",
+            "alpha": -1.9474121311292538e-14,
+            "metric": -6.939013094347185e-15
+          },
+          {
+            "conc": 100.0,
+            "name": "B1(100)",
+            "alpha": 0.9069970831868454,
+            "metric": 0.3231809300232042
+          },
+          {
+            "conc": 80.0,
+            "name": "B2(80)",
+            "alpha": 0.9999999999999806,
+            "metric": 0.3563197015889644
+          },
+          {
+            "conc": 20.0,
+            "name": "B3(20)",
+            "alpha": 0.870685908716245,
+            "metric": 0.31024254317149474
+          }
+        ]
+      }
+    },
+    {
+      "fluorophore": "FLUORESCEIN",
+      "metric_mode": "unmixing",
+      "std_set": "4pts_blank_as_zero",
+      "regression_method": "weighted_1y2",
+      "points": [
+        {
+          "concentration": 0.0,
+          "area": -6.939013094347185e-15
+        },
+        {
+          "concentration": 100.0,
+          "area": 0.3231809300232042
+        },
+        {
+          "concentration": 80.0,
+          "area": 0.3563197015889644
+        },
+        {
+          "concentration": 20.0,
+          "area": 0.31024254317149474
+        }
+      ],
+      "point_rows": [
+        {
+          "concentration": 0.0,
+          "file": "B0(blank)",
+          "blank": "B0.dng",
+          "metric": -6.939013094347185e-15
+        },
+        {
+          "concentration": 100.0,
+          "file": "B1(100)",
+          "blank": "B0.dng",
+          "metric": 0.3231809300232042
+        },
+        {
+          "concentration": 80.0,
+          "file": "B2(80)",
+          "blank": "B0.dng",
+          "metric": 0.3563197015889644
+        },
+        {
+          "concentration": 20.0,
+          "file": "B3(20)",
+          "blank": "B0.dng",
+          "metric": 0.31024254317149474
+        }
+      ],
+      "sample": {
+        "file": "S.dng",
+        "blank": "B0.dng",
+        "metric": 0.3088709918934088
+      },
+      "python_fit": {
+        "slope": 0.003981227379984164,
+        "intercept": -6.939013094347088e-15,
+        "r_value": 0.8911408016974254,
+        "r_squared": 0.7941319284499301,
+        "sample_conc": 77.58185162854082,
+        "sample_mean_area": 0.3088709918934088,
+        "mode": "lod_iupac",
+        "regression_method": "weighted_1y2",
+        "syx": 0.5556996556820222,
+        "lod_conc": 460.6139485954121,
+        "loq_conc": 1395.7998442285216,
+        "lod_signal": 1.8338088637506662,
+        "loq_signal": 5.556996556820215
+      },
+      "reference_fits": {
+        "ols_linear": {
+          "r_squared": 0.5467461001752447,
+          "slope": 0.0025796119490712715,
+          "intercept": 0.11845519624235054,
+          "n": 4,
+          "x": "concentration",
+          "y": "area"
+        },
+        "log10x": {
+          "r_squared": 0.38658270756609975,
+          "slope": 0.03901932988106438,
+          "intercept": 0.2622273001465909,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "area",
+          "note": "0 mg/L 点被剔除（log10(0) 无定义）"
+        },
+        "loglog": {
+          "r_squared": 0.40176461549022446,
+          "slope": 0.05172008180716232,
+          "intercept": -0.5720568656833295,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "log10(area)",
+          "note": "0 mg/L 与非正面积点均剔除"
+        },
+        "log10_conc_plus_1": {
+          "r_squared": 0.9261287183098326,
+          "slope": 0.17315217452506435,
+          "intercept": 0.020821773329151444,
+          "n": 4,
+          "x": "log10(concentration + 1)",
+          "y": "area",
+          "note": "保留 0 mg/L 点的另一种处理方式（+1 平移）"
+        }
+      },
+      "extra": {
+        "unmix_window": [
+          490.0,
+          610.0
+        ],
+        "scatter_peak_wl": 466.04988735190705,
+        "ref_standard": "B2(80) (C=80)",
+        "auc_E": 0.35631970158897136,
+        "alpha_sample": 0.8668366933291369,
+        "per_row_alpha": [
+          {
+            "conc": 0.0,
+            "name": "B0(blank)",
+            "alpha": -1.9474121311292538e-14,
+            "metric": -6.939013094347185e-15
+          },
+          {
+            "conc": 100.0,
+            "name": "B1(100)",
+            "alpha": 0.9069970831868454,
+            "metric": 0.3231809300232042
+          },
+          {
+            "conc": 80.0,
+            "name": "B2(80)",
+            "alpha": 0.9999999999999806,
+            "metric": 0.3563197015889644
+          },
+          {
+            "conc": 20.0,
+            "name": "B3(20)",
+            "alpha": 0.870685908716245,
+            "metric": 0.31024254317149474
+          }
+        ]
+      }
+    },
+    {
+      "fluorophore": "FLUORESCEIN",
+      "metric_mode": "legacy",
+      "std_set": "3pts_blank_not_a_point",
+      "regression_method": "ols",
+      "points": [
+        {
+          "concentration": 100.0,
+          "area": 0.355238536117078
+        },
+        {
+          "concentration": 80.0,
+          "area": 0.3563211017583548
+        },
+        {
+          "concentration": 20.0,
+          "area": 0.29852349235988435
+        }
+      ],
+      "point_rows": [
+        {
+          "concentration": 100.0,
+          "file": "B1(100)",
+          "blank": "B0.dng",
+          "metric": 0.355238536117078
+        },
+        {
+          "concentration": 80.0,
+          "file": "B2(80)",
+          "blank": "B0.dng",
+          "metric": 0.3563211017583548
+        },
+        {
+          "concentration": 20.0,
+          "file": "B3(20)",
+          "blank": "B0.dng",
+          "metric": 0.29852349235988435
+        }
+      ],
+      "sample": {
+        "file": "S.dng",
+        "blank": "B0.dng",
+        "metric": 0.3036174524919326
+      },
+      "python_fit": {
+        "slope": 0.00076763545689021,
+        "intercept": 0.28551867961909166,
+        "r_value": 0.966662795797157,
+        "r_squared": 0.934436960778376,
+        "sample_conc": 23.57730184345758,
+        "sample_mean_area": 0.3036174524919326,
+        "mode": "lod_iupac",
+        "regression_method": "ols",
+        "syx": 0.011971969544256167,
+        "lod_conc": 51.46648600117471,
+        "loq_conc": 155.95904848840823,
+        "lod_signal": 0.325026179115137,
+        "loq_signal": 0.40523837506165333
+      },
+      "reference_fits": {
+        "ols_linear": {
+          "r_squared": 0.934436960778376,
+          "slope": 0.00076763545689021,
+          "intercept": 0.28551867961909166,
+          "n": 3,
+          "x": "concentration",
+          "y": "area"
+        },
+        "log10x": {
+          "r_squared": 0.9792134718310008,
+          "slope": 0.08639297004707305,
+          "intercept": 0.18682791615078312,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "area",
+          "note": "0 mg/L 点被剔除（log10(0) 无定义）"
+        },
+        "loglog": {
+          "r_squared": 0.9795985244861138,
+          "slope": 0.11500033244836552,
+          "intercept": -0.6737118000447699,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "log10(area)",
+          "note": "0 mg/L 与非正面积点均剔除"
+        }
+      },
+      "extra": {
+        "integration_window": [
+          507.65827293467294,
+          532.4773099489544
+        ]
+      }
+    },
+    {
+      "fluorophore": "FLUORESCEIN",
+      "metric_mode": "legacy",
+      "std_set": "3pts_blank_not_a_point",
+      "regression_method": "weighted_1y2",
+      "points": [
+        {
+          "concentration": 100.0,
+          "area": 0.355238536117078
+        },
+        {
+          "concentration": 80.0,
+          "area": 0.3563211017583548
+        },
+        {
+          "concentration": 20.0,
+          "area": 0.29852349235988435
+        }
+      ],
+      "point_rows": [
+        {
+          "concentration": 100.0,
+          "file": "B1(100)",
+          "blank": "B0.dng",
+          "metric": 0.355238536117078
+        },
+        {
+          "concentration": 80.0,
+          "file": "B2(80)",
+          "blank": "B0.dng",
+          "metric": 0.3563211017583548
+        },
+        {
+          "concentration": 20.0,
+          "file": "B3(20)",
+          "blank": "B0.dng",
+          "metric": 0.29852349235988435
+        }
+      ],
+      "sample": {
+        "file": "S.dng",
+        "blank": "B0.dng",
+        "metric": 0.3036174524919326
+      },
+      "python_fit": {
+        "slope": 0.0007767703689398372,
+        "intercept": 0.28465873189275404,
+        "r_value": 0.9730394160905764,
+        "r_squared": 0.9468057052658899,
+        "sample_conc": 24.407110978054032,
+        "sample_mean_area": 0.3036174524919326,
+        "mode": "lod_iupac",
+        "regression_method": "weighted_1y2",
+        "syx": 0.03382906239626275,
+        "lod_conc": 143.7180283537741,
+        "loq_conc": 435.50917682961847,
+        "lod_signal": 0.3962946378004211,
+        "loq_signal": 0.6229493558553816
+      },
+      "reference_fits": {
+        "ols_linear": {
+          "r_squared": 0.934436960778376,
+          "slope": 0.00076763545689021,
+          "intercept": 0.28551867961909166,
+          "n": 3,
+          "x": "concentration",
+          "y": "area"
+        },
+        "log10x": {
+          "r_squared": 0.9792134718310008,
+          "slope": 0.08639297004707305,
+          "intercept": 0.18682791615078312,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "area",
+          "note": "0 mg/L 点被剔除（log10(0) 无定义）"
+        },
+        "loglog": {
+          "r_squared": 0.9795985244861138,
+          "slope": 0.11500033244836552,
+          "intercept": -0.6737118000447699,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "log10(area)",
+          "note": "0 mg/L 与非正面积点均剔除"
+        }
+      },
+      "extra": {
+        "integration_window": [
+          507.65827293467294,
+          532.4773099489544
+        ]
+      }
+    },
+    {
+      "fluorophore": "FLUORESCEIN",
+      "metric_mode": "legacy",
+      "std_set": "4pts_blank_as_zero",
+      "regression_method": "ols",
+      "points": [
+        {
+          "concentration": 0.0,
+          "area": 1.1695601648142044e-05
+        },
+        {
+          "concentration": 100.0,
+          "area": 0.355238536117078
+        },
+        {
+          "concentration": 80.0,
+          "area": 0.3563211017583548
+        },
+        {
+          "concentration": 20.0,
+          "area": 0.29852349235988435
+        }
+      ],
+      "point_rows": [
+        {
+          "concentration": 0.0,
+          "file": "B0(blank)",
+          "blank": "B0.dng",
+          "metric": 1.1695601648142044e-05
+        },
+        {
+          "concentration": 100.0,
+          "file": "B1(100)",
+          "blank": "B0.dng",
+          "metric": 0.355238536117078
+        },
+        {
+          "concentration": 80.0,
+          "file": "B2(80)",
+          "blank": "B0.dng",
+          "metric": 0.3563211017583548
+        },
+        {
+          "concentration": 20.0,
+          "file": "B3(20)",
+          "blank": "B0.dng",
+          "metric": 0.29852349235988435
+        }
+      ],
+      "sample": {
+        "file": "S.dng",
+        "blank": "B0.dng",
+        "metric": 0.3036174524919326
+      },
+      "python_fit": {
+        "slope": 0.0028669515158420006,
+        "intercept": 0.1091761306671413,
+        "r_value": 0.8005901797549458,
+        "r_squared": 0.6409446359200565,
+        "sample_conc": 67.82162891502037,
+        "sample_mean_area": 0.3036174524919326,
+        "mode": "lod_iupac",
+        "regression_method": "ols",
+        "syx": 0.1251210147662766,
+        "lod_conc": 144.02034580882946,
+        "loq_conc": 436.42529032978626,
+        "lod_signal": 0.5220754793958541,
+        "loq_signal": 1.3603862783299072
+      },
+      "reference_fits": {
+        "ols_linear": {
+          "r_squared": 0.6409446359200565,
+          "slope": 0.0028669515158420006,
+          "intercept": 0.1091761306671413,
+          "n": 4,
+          "x": "concentration",
+          "y": "area"
+        },
+        "log10x": {
+          "r_squared": 0.9792134718310008,
+          "slope": 0.08639297004707305,
+          "intercept": 0.18682791615078312,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "area",
+          "note": "0 mg/L 点被剔除（log10(0) 无定义）"
+        },
+        "loglog": {
+          "r_squared": 0.9795985244861138,
+          "slope": 0.11500033244836552,
+          "intercept": -0.6737118000447699,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "log10(area)",
+          "note": "0 mg/L 与非正面积点均剔除"
+        },
+        "log10_conc_plus_1": {
+          "r_squared": 0.96903418296997,
+          "slope": 0.1818069075503557,
+          "intercept": 0.01458274866624168,
+          "n": 4,
+          "x": "log10(concentration + 1)",
+          "y": "area",
+          "note": "保留 0 mg/L 点的另一种处理方式（+1 平移）"
+        }
+      },
+      "extra": {
+        "integration_window": [
+          507.65827293467294,
+          532.4773099489544
+        ]
+      }
+    },
+    {
+      "fluorophore": "FLUORESCEIN",
+      "metric_mode": "legacy",
+      "std_set": "4pts_blank_as_zero",
+      "regression_method": "weighted_1y2",
+      "points": [
+        {
+          "concentration": 0.0,
+          "area": 1.1695601648142044e-05
+        },
+        {
+          "concentration": 100.0,
+          "area": 0.355238536117078
+        },
+        {
+          "concentration": 80.0,
+          "area": 0.3563211017583548
+        },
+        {
+          "concentration": 20.0,
+          "area": 0.29852349235988435
+        }
+      ],
+      "point_rows": [
+        {
+          "concentration": 0.0,
+          "file": "B0(blank)",
+          "blank": "B0.dng",
+          "metric": 1.1695601648142044e-05
+        },
+        {
+          "concentration": 100.0,
+          "file": "B1(100)",
+          "blank": "B0.dng",
+          "metric": 0.355238536117078
+        },
+        {
+          "concentration": 80.0,
+          "file": "B2(80)",
+          "blank": "B0.dng",
+          "metric": 0.3563211017583548
+        },
+        {
+          "concentration": 20.0,
+          "file": "B3(20)",
+          "blank": "B0.dng",
+          "metric": 0.29852349235988435
+        }
+      ],
+      "sample": {
+        "file": "S.dng",
+        "blank": "B0.dng",
+        "metric": 0.3036174524919326
+      },
+      "python_fit": {
+        "slope": 0.004271648143766189,
+        "intercept": 1.1695866437799961e-05,
+        "r_value": 0.9032908490459677,
+        "r_squared": 0.8159343579701852,
+        "sample_conc": 71.07461719864745,
+        "sample_mean_area": 0.3036174524919326,
+        "mode": "lod_iupac",
+        "regression_method": "weighted_1y2",
+        "syx": 0.525432345175965,
+        "lod_conc": 405.915159845523,
+        "loq_conc": 1230.0459389258274,
+        "lod_signal": 1.7339384349471223,
+        "loq_signal": 5.254335147626088
+      },
+      "reference_fits": {
+        "ols_linear": {
+          "r_squared": 0.6409446359200565,
+          "slope": 0.0028669515158420006,
+          "intercept": 0.1091761306671413,
+          "n": 4,
+          "x": "concentration",
+          "y": "area"
+        },
+        "log10x": {
+          "r_squared": 0.9792134718310008,
+          "slope": 0.08639297004707305,
+          "intercept": 0.18682791615078312,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "area",
+          "note": "0 mg/L 点被剔除（log10(0) 无定义）"
+        },
+        "loglog": {
+          "r_squared": 0.9795985244861138,
+          "slope": 0.11500033244836552,
+          "intercept": -0.6737118000447699,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "log10(area)",
+          "note": "0 mg/L 与非正面积点均剔除"
+        },
+        "log10_conc_plus_1": {
+          "r_squared": 0.96903418296997,
+          "slope": 0.1818069075503557,
+          "intercept": 0.01458274866624168,
+          "n": 4,
+          "x": "log10(concentration + 1)",
+          "y": "area",
+          "note": "保留 0 mg/L 点的另一种处理方式（+1 平移）"
+        }
+      },
+      "extra": {
+        "integration_window": [
+          507.65827293467294,
+          532.4773099489544
+        ]
+      }
+    },
+    {
+      "fluorophore": "EGFP",
+      "metric_mode": "unmixing",
+      "std_set": "3pts_blank_not_a_point",
+      "regression_method": "ols",
+      "points": [
+        {
+          "concentration": 100.0,
+          "area": 0.2575309403100708
+        },
+        {
+          "concentration": 80.0,
+          "area": 0.23829218981476957
+        },
+        {
+          "concentration": 20.0,
+          "area": 0.18852659586998724
+        }
+      ],
+      "point_rows": [
+        {
+          "concentration": 100.0,
+          "file": "B1(100)",
+          "blank": "B0.dng",
+          "metric": 0.2575309403100708
+        },
+        {
+          "concentration": 80.0,
+          "file": "B2(80)",
+          "blank": "B0.dng",
+          "metric": 0.23829218981476957
+        },
+        {
+          "concentration": 20.0,
+          "file": "B3(20)",
+          "blank": "B0.dng",
+          "metric": 0.18852659586998724
+        }
+      ],
+      "sample": {
+        "file": "S.dng",
+        "blank": "B0.dng",
+        "metric": 0.19842051140522954
+      },
+      "python_fit": {
+        "slope": 0.0008549094424807354,
+        "intercept": 0.17112261249956018,
+        "r_value": 0.9995205558524647,
+        "r_squared": 0.99904134157162,
+        "sample_conc": 31.930749093679,
+        "sample_mean_area": 0.19842051140522954,
+        "mode": "lod_iupac",
+        "regression_method": "ols",
+        "syx": 0.001559252228771997,
+        "lod_conc": 6.0188039800058,
+        "loq_conc": 18.238799939411514,
+        "lod_signal": 0.17626814485450776,
+        "loq_signal": 0.18671513478728013
+      },
+      "reference_fits": {
+        "ols_linear": {
+          "r_squared": 0.99904134157162,
+          "slope": 0.0008549094424807354,
+          "intercept": 0.17112261249956018,
+          "n": 3,
+          "x": "concentration",
+          "y": "area"
+        },
+        "log10x": {
+          "r_squared": 0.9790577603264241,
+          "slope": 0.09304482709154262,
+          "intercept": 0.06671109401498843,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "area",
+          "note": "0 mg/L 点被剔除（log10(0) 无定义）"
+        },
+        "loglog": {
+          "r_squared": 0.9872584150283623,
+          "slope": 0.18502431210645545,
+          "intercept": -0.9665256240980571,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "log10(area)",
+          "note": "0 mg/L 与非正面积点均剔除"
+        }
+      },
+      "extra": {
+        "unmix_window": [
+          479.0,
+          599.0
+        ],
+        "scatter_peak_wl": 466.04988735190705,
+        "ref_standard": "B1(100) (C=100)",
+        "auc_E": 0.25753094031008306,
+        "alpha_sample": 0.7704725155211217,
+        "per_row_alpha": [
+          {
+            "conc": 100.0,
+            "name": "B1(100)",
+            "alpha": 0.9999999999999524,
+            "metric": 0.2575309403100708
+          },
+          {
+            "conc": 80.0,
+            "name": "B2(80)",
+            "alpha": 0.9252953820921523,
+            "metric": 0.23829218981476957
+          },
+          {
+            "conc": 20.0,
+            "name": "B3(20)",
+            "alpha": 0.7320541587856964,
+            "metric": 0.18852659586998724
+          }
+        ]
+      }
+    },
+    {
+      "fluorophore": "EGFP",
+      "metric_mode": "unmixing",
+      "std_set": "3pts_blank_not_a_point",
+      "regression_method": "weighted_1y2",
+      "points": [
+        {
+          "concentration": 100.0,
+          "area": 0.2575309403100708
+        },
+        {
+          "concentration": 80.0,
+          "area": 0.23829218981476957
+        },
+        {
+          "concentration": 20.0,
+          "area": 0.18852659586998724
+        }
+      ],
+      "point_rows": [
+        {
+          "concentration": 100.0,
+          "file": "B1(100)",
+          "blank": "B0.dng",
+          "metric": 0.2575309403100708
+        },
+        {
+          "concentration": 80.0,
+          "file": "B2(80)",
+          "blank": "B0.dng",
+          "metric": 0.23829218981476957
+        },
+        {
+          "concentration": 20.0,
+          "file": "B3(20)",
+          "blank": "B0.dng",
+          "metric": 0.18852659586998724
+        }
+      ],
+      "sample": {
+        "file": "S.dng",
+        "blank": "B0.dng",
+        "metric": 0.19842051140522954
+      },
+      "python_fit": {
+        "slope": 0.000852014448667102,
+        "intercept": 0.1713029263029071,
+        "r_value": 0.9996270162461898,
+        "r_squared": 0.9992541716092601,
+        "sample_conc": 31.827611779055378,
+        "sample_mean_area": 0.19842051140522954,
+        "mode": "lod_iupac",
+        "regression_method": "weighted_1y2",
+        "syx": 0.006404800184094021,
+        "lod_conc": 24.806903968090378,
+        "loq_conc": 75.17243626694055,
+        "lod_signal": 0.1924387669104174,
+        "loq_signal": 0.23535092814384734
+      },
+      "reference_fits": {
+        "ols_linear": {
+          "r_squared": 0.99904134157162,
+          "slope": 0.0008549094424807354,
+          "intercept": 0.17112261249956018,
+          "n": 3,
+          "x": "concentration",
+          "y": "area"
+        },
+        "log10x": {
+          "r_squared": 0.9790577603264241,
+          "slope": 0.09304482709154262,
+          "intercept": 0.06671109401498843,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "area",
+          "note": "0 mg/L 点被剔除（log10(0) 无定义）"
+        },
+        "loglog": {
+          "r_squared": 0.9872584150283623,
+          "slope": 0.18502431210645545,
+          "intercept": -0.9665256240980571,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "log10(area)",
+          "note": "0 mg/L 与非正面积点均剔除"
+        }
+      },
+      "extra": {
+        "unmix_window": [
+          479.0,
+          599.0
+        ],
+        "scatter_peak_wl": 466.04988735190705,
+        "ref_standard": "B1(100) (C=100)",
+        "auc_E": 0.25753094031008306,
+        "alpha_sample": 0.7704725155211217,
+        "per_row_alpha": [
+          {
+            "conc": 100.0,
+            "name": "B1(100)",
+            "alpha": 0.9999999999999524,
+            "metric": 0.2575309403100708
+          },
+          {
+            "conc": 80.0,
+            "name": "B2(80)",
+            "alpha": 0.9252953820921523,
+            "metric": 0.23829218981476957
+          },
+          {
+            "conc": 20.0,
+            "name": "B3(20)",
+            "alpha": 0.7320541587856964,
+            "metric": 0.18852659586998724
+          }
+        ]
+      }
+    },
+    {
+      "fluorophore": "EGFP",
+      "metric_mode": "unmixing",
+      "std_set": "4pts_blank_as_zero",
+      "regression_method": "ols",
+      "points": [
+        {
+          "concentration": 0.0,
+          "area": -1.2177064621990179e-14
+        },
+        {
+          "concentration": 100.0,
+          "area": 0.2575309403100708
+        },
+        {
+          "concentration": 80.0,
+          "area": 0.23829218981476957
+        },
+        {
+          "concentration": 20.0,
+          "area": 0.18852659586998724
+        }
+      ],
+      "point_rows": [
+        {
+          "concentration": 0.0,
+          "file": "B0(blank)",
+          "blank": "B0.dng",
+          "metric": -1.2177064621990179e-14
+        },
+        {
+          "concentration": 100.0,
+          "file": "B1(100)",
+          "blank": "B0.dng",
+          "metric": 0.2575309403100708
+        },
+        {
+          "concentration": 80.0,
+          "file": "B2(80)",
+          "blank": "B0.dng",
+          "metric": 0.23829218981476957
+        },
+        {
+          "concentration": 20.0,
+          "file": "B3(20)",
+          "blank": "B0.dng",
+          "metric": 0.18852659586998724
+        }
+      ],
+      "sample": {
+        "file": "S.dng",
+        "blank": "B0.dng",
+        "metric": 0.19842051140522954
+      },
+      "python_fit": {
+        "slope": 0.0021131639461540617,
+        "intercept": 0.06542923419100079,
+        "r_value": 0.8547301328827176,
+        "r_squared": 0.730563600057708,
+        "sample_conc": 62.93467076053026,
+        "sample_mean_area": 0.19842051140522954,
+        "mode": "lod_iupac",
+        "regression_method": "ols",
+        "syx": 0.07482931496454251,
+        "lod_conc": 116.85640379792244,
+        "loq_conc": 354.1103145391589,
+        "lod_signal": 0.31236597357399104,
+        "loq_signal": 0.8137223838364258
+      },
+      "reference_fits": {
+        "ols_linear": {
+          "r_squared": 0.730563600057708,
+          "slope": 0.0021131639461540617,
+          "intercept": 0.06542923419100079,
+          "n": 4,
+          "x": "concentration",
+          "y": "area"
+        },
+        "log10x": {
+          "r_squared": 0.9790577603264241,
+          "slope": 0.09304482709154262,
+          "intercept": 0.06671109401498843,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "area",
+          "note": "0 mg/L 点被剔除（log10(0) 无定义）"
+        },
+        "loglog": {
+          "r_squared": 0.9872584150283623,
+          "slope": 0.18502431210645545,
+          "intercept": -0.9665256240980571,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "log10(area)",
+          "note": "0 mg/L 与非正面积点均剔除"
+        },
+        "log10_conc_plus_1": {
+          "r_squared": 0.9914575436513999,
+          "slope": 0.12696148089081669,
+          "intercept": 0.004925778055413443,
+          "n": 4,
+          "x": "log10(concentration + 1)",
+          "y": "area",
+          "note": "保留 0 mg/L 点的另一种处理方式（+1 平移）"
+        }
+      },
+      "extra": {
+        "unmix_window": [
+          479.0,
+          599.0
+        ],
+        "scatter_peak_wl": 466.04988735190705,
+        "ref_standard": "B1(100) (C=100)",
+        "auc_E": 0.25753094031008306,
+        "alpha_sample": 0.7704725155211217,
+        "per_row_alpha": [
+          {
+            "conc": 0.0,
+            "name": "B0(blank)",
+            "alpha": -4.728388987873941e-14,
+            "metric": -1.2177064621990179e-14
+          },
+          {
+            "conc": 100.0,
+            "name": "B1(100)",
+            "alpha": 0.9999999999999524,
+            "metric": 0.2575309403100708
+          },
+          {
+            "conc": 80.0,
+            "name": "B2(80)",
+            "alpha": 0.9252953820921523,
+            "metric": 0.23829218981476957
+          },
+          {
+            "conc": 20.0,
+            "name": "B3(20)",
+            "alpha": 0.7320541587856964,
+            "metric": 0.18852659586998724
+          }
+        ]
+      }
+    },
+    {
+      "fluorophore": "EGFP",
+      "metric_mode": "unmixing",
+      "std_set": "4pts_blank_as_zero",
+      "regression_method": "weighted_1y2",
+      "points": [
+        {
+          "concentration": 0.0,
+          "area": -1.2177064621990179e-14
+        },
+        {
+          "concentration": 100.0,
+          "area": 0.2575309403100708
+        },
+        {
+          "concentration": 80.0,
+          "area": 0.23829218981476957
+        },
+        {
+          "concentration": 20.0,
+          "area": 0.18852659586998724
+        }
+      ],
+      "point_rows": [
+        {
+          "concentration": 0.0,
+          "file": "B0(blank)",
+          "blank": "B0.dng",
+          "metric": -1.2177064621990179e-14
+        },
+        {
+          "concentration": 100.0,
+          "file": "B1(100)",
+          "blank": "B0.dng",
+          "metric": 0.2575309403100708
+        },
+        {
+          "concentration": 80.0,
+          "file": "B2(80)",
+          "blank": "B0.dng",
+          "metric": 0.23829218981476957
+        },
+        {
+          "concentration": 20.0,
+          "file": "B3(20)",
+          "blank": "B0.dng",
+          "metric": 0.18852659586998724
+        }
+      ],
+      "sample": {
+        "file": "S.dng",
+        "blank": "B0.dng",
+        "metric": 0.19842051140522954
+      },
+      "python_fit": {
+        "slope": 0.0030214115550656565,
+        "intercept": -1.2177064621989752e-14,
+        "r_value": 0.9143498413601312,
+        "r_squared": 0.8360356323952971,
+        "sample_conc": 65.67146109988646,
+        "sample_mean_area": 0.19842051140522954,
+        "mode": "lod_iupac",
+        "regression_method": "weighted_1y2",
+        "syx": 0.49592998639634717,
+        "lod_conc": 541.657078250097,
+        "loq_conc": 1641.3850856063548,
+        "lod_signal": 1.6365689551079334,
+        "loq_signal": 4.95929986396346
+      },
+      "reference_fits": {
+        "ols_linear": {
+          "r_squared": 0.730563600057708,
+          "slope": 0.0021131639461540617,
+          "intercept": 0.06542923419100079,
+          "n": 4,
+          "x": "concentration",
+          "y": "area"
+        },
+        "log10x": {
+          "r_squared": 0.9790577603264241,
+          "slope": 0.09304482709154262,
+          "intercept": 0.06671109401498843,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "area",
+          "note": "0 mg/L 点被剔除（log10(0) 无定义）"
+        },
+        "loglog": {
+          "r_squared": 0.9872584150283623,
+          "slope": 0.18502431210645545,
+          "intercept": -0.9665256240980571,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "log10(area)",
+          "note": "0 mg/L 与非正面积点均剔除"
+        },
+        "log10_conc_plus_1": {
+          "r_squared": 0.9914575436513999,
+          "slope": 0.12696148089081669,
+          "intercept": 0.004925778055413443,
+          "n": 4,
+          "x": "log10(concentration + 1)",
+          "y": "area",
+          "note": "保留 0 mg/L 点的另一种处理方式（+1 平移）"
+        }
+      },
+      "extra": {
+        "unmix_window": [
+          479.0,
+          599.0
+        ],
+        "scatter_peak_wl": 466.04988735190705,
+        "ref_standard": "B1(100) (C=100)",
+        "auc_E": 0.25753094031008306,
+        "alpha_sample": 0.7704725155211217,
+        "per_row_alpha": [
+          {
+            "conc": 0.0,
+            "name": "B0(blank)",
+            "alpha": -4.728388987873941e-14,
+            "metric": -1.2177064621990179e-14
+          },
+          {
+            "conc": 100.0,
+            "name": "B1(100)",
+            "alpha": 0.9999999999999524,
+            "metric": 0.2575309403100708
+          },
+          {
+            "conc": 80.0,
+            "name": "B2(80)",
+            "alpha": 0.9252953820921523,
+            "metric": 0.23829218981476957
+          },
+          {
+            "conc": 20.0,
+            "name": "B3(20)",
+            "alpha": 0.7320541587856964,
+            "metric": 0.18852659586998724
+          }
+        ]
+      }
+    },
+    {
+      "fluorophore": "EGFP",
+      "metric_mode": "legacy",
+      "std_set": "3pts_blank_not_a_point",
+      "regression_method": "ols",
+      "points": [
+        {
+          "concentration": 100.0,
+          "area": 0.25766600792664396
+        },
+        {
+          "concentration": 80.0,
+          "area": 0.21475990849899979
+        },
+        {
+          "concentration": 20.0,
+          "area": 0.16520845334843035
+        }
+      ],
+      "point_rows": [
+        {
+          "concentration": 100.0,
+          "file": "B1(100)",
+          "blank": "B0.dng",
+          "metric": 0.25766600792664396
+        },
+        {
+          "concentration": 80.0,
+          "file": "B2(80)",
+          "blank": "B0.dng",
+          "metric": 0.21475990849899979
+        },
+        {
+          "concentration": 20.0,
+          "file": "B3(20)",
+          "blank": "B0.dng",
+          "metric": 0.16520845334843035
+        }
+      ],
+      "sample": {
+        "file": "S.dng",
+        "blank": "B0.dng",
+        "metric": 0.17689262969131403
+      },
+      "python_fit": {
+        "slope": 0.0010795974676773212,
+        "intercept": 0.14057162541286994,
+        "r_value": 0.9714420336214843,
+        "r_squared": 0.943699624686645,
+        "sample_conc": 33.643098808471834,
+        "sample_mean_area": 0.17689262969131403,
+        "mode": "lod_iupac",
+        "regression_method": "ols",
+        "syx": 0.015525895306209944,
+        "lod_conc": 47.45792394337709,
+        "loq_conc": 143.81189073750633,
+        "lod_signal": 0.19180707992336277,
+        "loq_signal": 0.2958305784749694
+      },
+      "reference_fits": {
+        "ols_linear": {
+          "r_squared": 0.943699624686645,
+          "slope": 0.0010795974676773212,
+          "intercept": 0.14057162541286994,
+          "n": 3,
+          "x": "concentration",
+          "y": "area"
+        },
+        "log10x": {
+          "r_squared": 0.8799497304984273,
+          "slope": 0.11461292328505757,
+          "intercept": 0.013724988478565153,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "area",
+          "note": "0 mg/L 点被剔除（log10(0) 无定义）"
+        },
+        "loglog": {
+          "r_squared": 0.9173930959665446,
+          "slope": 0.24542678358580655,
+          "intercept": -1.1053959413837697,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "log10(area)",
+          "note": "0 mg/L 与非正面积点均剔除"
+        }
+      },
+      "extra": {
+        "integration_window": [
+          499.2635986504307,
+          518.9728339264777
+        ]
+      }
+    },
+    {
+      "fluorophore": "EGFP",
+      "metric_mode": "legacy",
+      "std_set": "3pts_blank_not_a_point",
+      "regression_method": "weighted_1y2",
+      "points": [
+        {
+          "concentration": 100.0,
+          "area": 0.25766600792664396
+        },
+        {
+          "concentration": 80.0,
+          "area": 0.21475990849899979
+        },
+        {
+          "concentration": 20.0,
+          "area": 0.16520845334843035
+        }
+      ],
+      "point_rows": [
+        {
+          "concentration": 100.0,
+          "file": "B1(100)",
+          "blank": "B0.dng",
+          "metric": 0.25766600792664396
+        },
+        {
+          "concentration": 80.0,
+          "file": "B2(80)",
+          "blank": "B0.dng",
+          "metric": 0.21475990849899979
+        },
+        {
+          "concentration": 20.0,
+          "file": "B3(20)",
+          "blank": "B0.dng",
+          "metric": 0.16520845334843035
+        }
+      ],
+      "sample": {
+        "file": "S.dng",
+        "blank": "B0.dng",
+        "metric": 0.17689262969131403
+      },
+      "python_fit": {
+        "slope": 0.0010309063163933094,
+        "intercept": 0.14300475616788347,
+        "r_value": 0.9765104827895392,
+        "r_squared": 0.953572722997859,
+        "sample_conc": 32.871923456623506,
+        "sample_mean_area": 0.17689262969131403,
+        "mode": "lod_iupac",
+        "regression_method": "weighted_1y2",
+        "syx": 0.06781600857087396,
+        "lod_conc": 217.08357464220157,
+        "loq_conc": 657.8290140672775,
+        "lod_signal": 0.3667975844517675,
+        "loq_signal": 0.821164841876623
+      },
+      "reference_fits": {
+        "ols_linear": {
+          "r_squared": 0.943699624686645,
+          "slope": 0.0010795974676773212,
+          "intercept": 0.14057162541286994,
+          "n": 3,
+          "x": "concentration",
+          "y": "area"
+        },
+        "log10x": {
+          "r_squared": 0.8799497304984273,
+          "slope": 0.11461292328505757,
+          "intercept": 0.013724988478565153,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "area",
+          "note": "0 mg/L 点被剔除（log10(0) 无定义）"
+        },
+        "loglog": {
+          "r_squared": 0.9173930959665446,
+          "slope": 0.24542678358580655,
+          "intercept": -1.1053959413837697,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "log10(area)",
+          "note": "0 mg/L 与非正面积点均剔除"
+        }
+      },
+      "extra": {
+        "integration_window": [
+          499.2635986504307,
+          518.9728339264777
+        ]
+      }
+    },
+    {
+      "fluorophore": "EGFP",
+      "metric_mode": "legacy",
+      "std_set": "4pts_blank_as_zero",
+      "regression_method": "ols",
+      "points": [
+        {
+          "concentration": 0.0,
+          "area": 6.826605476718286e-06
+        },
+        {
+          "concentration": 100.0,
+          "area": 0.25766600792664396
+        },
+        {
+          "concentration": 80.0,
+          "area": 0.21475990849899979
+        },
+        {
+          "concentration": 20.0,
+          "area": 0.16520845334843035
+        }
+      ],
+      "point_rows": [
+        {
+          "concentration": 0.0,
+          "file": "B0(blank)",
+          "blank": "B0.dng",
+          "metric": 6.826605476718286e-06
+        },
+        {
+          "concentration": 100.0,
+          "file": "B1(100)",
+          "blank": "B0.dng",
+          "metric": 0.25766600792664396
+        },
+        {
+          "concentration": 80.0,
+          "file": "B2(80)",
+          "blank": "B0.dng",
+          "metric": 0.21475990849899979
+        },
+        {
+          "concentration": 20.0,
+          "file": "B3(20)",
+          "blank": "B0.dng",
+          "metric": 0.16520845334843035
+        }
+      ],
+      "sample": {
+        "file": "S.dng",
+        "blank": "B0.dng",
+        "metric": 0.17689262969131403
+      },
+      "python_fit": {
+        "slope": 0.002113162164790507,
+        "intercept": 0.05375219085536237,
+        "r_value": 0.8920275491638083,
+        "r_squared": 0.7957131484671904,
+        "sample_conc": 58.273066254789526,
+        "sample_mean_area": 0.17689262969131403,
+        "mode": "lod_iupac",
+        "regression_method": "ols",
+        "syx": 0.062433003041959444,
+        "lod_conc": 97.49791732566408,
+        "loq_conc": 295.44823432019416,
+        "lod_signal": 0.25978110089382855,
+        "loq_signal": 0.6780822212749569
+      },
+      "reference_fits": {
+        "ols_linear": {
+          "r_squared": 0.7957131484671904,
+          "slope": 0.002113162164790507,
+          "intercept": 0.05375219085536237,
+          "n": 4,
+          "x": "concentration",
+          "y": "area"
+        },
+        "log10x": {
+          "r_squared": 0.8799497304984273,
+          "slope": 0.11461292328505757,
+          "intercept": 0.013724988478565153,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "area",
+          "note": "0 mg/L 点被剔除（log10(0) 无定义）"
+        },
+        "loglog": {
+          "r_squared": 0.9173930959665446,
+          "slope": 0.24542678358580655,
+          "intercept": -1.1053959413837697,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "log10(area)",
+          "note": "0 mg/L 与非正面积点均剔除"
+        },
+        "log10_conc_plus_1": {
+          "r_squared": 0.9865518174239114,
+          "slope": 0.12135152846310716,
+          "intercept": 0.0005907069176284141,
+          "n": 4,
+          "x": "log10(concentration + 1)",
+          "y": "area",
+          "note": "保留 0 mg/L 点的另一种处理方式（+1 平移）"
+        }
+      },
+      "extra": {
+        "integration_window": [
+          499.2635986504307,
+          518.9728339264777
+        ]
+      }
+    },
+    {
+      "fluorophore": "EGFP",
+      "metric_mode": "legacy",
+      "std_set": "4pts_blank_as_zero",
+      "regression_method": "weighted_1y2",
+      "points": [
+        {
+          "concentration": 0.0,
+          "area": 6.826605476718286e-06
+        },
+        {
+          "concentration": 100.0,
+          "area": 0.25766600792664396
+        },
+        {
+          "concentration": 80.0,
+          "area": 0.21475990849899979
+        },
+        {
+          "concentration": 20.0,
+          "area": 0.16520845334843035
+        }
+      ],
+      "point_rows": [
+        {
+          "concentration": 0.0,
+          "file": "B0(blank)",
+          "blank": "B0.dng",
+          "metric": 6.826605476718286e-06
+        },
+        {
+          "concentration": 100.0,
+          "file": "B1(100)",
+          "blank": "B0.dng",
+          "metric": 0.25766600792664396
+        },
+        {
+          "concentration": 80.0,
+          "file": "B2(80)",
+          "blank": "B0.dng",
+          "metric": 0.21475990849899979
+        },
+        {
+          "concentration": 20.0,
+          "file": "B3(20)",
+          "blank": "B0.dng",
+          "metric": 0.16520845334843035
+        }
+      ],
+      "sample": {
+        "file": "S.dng",
+        "blank": "B0.dng",
+        "metric": 0.17689262969131403
+      },
+      "python_fit": {
+        "slope": 0.0028997573619979587,
+        "intercept": 6.8267484340839185e-06,
+        "r_value": 0.923167179633744,
+        "r_squared": 0.8522376415529214,
+        "sample_conc": 61.000208245356106,
+        "sample_mean_area": 0.17689262969131403,
+        "mode": "lod_iupac",
+        "regression_method": "weighted_1y2",
+        "syx": 0.4707747016528489,
+        "lod_conc": 535.7539688713772,
+        "loq_conc": 1623.49687536781,
+        "lod_signal": 1.5535633422028354,
+        "loq_signal": 4.707753843276923
+      },
+      "reference_fits": {
+        "ols_linear": {
+          "r_squared": 0.7957131484671904,
+          "slope": 0.002113162164790507,
+          "intercept": 0.05375219085536237,
+          "n": 4,
+          "x": "concentration",
+          "y": "area"
+        },
+        "log10x": {
+          "r_squared": 0.8799497304984273,
+          "slope": 0.11461292328505757,
+          "intercept": 0.013724988478565153,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "area",
+          "note": "0 mg/L 点被剔除（log10(0) 无定义）"
+        },
+        "loglog": {
+          "r_squared": 0.9173930959665446,
+          "slope": 0.24542678358580655,
+          "intercept": -1.1053959413837697,
+          "n": 3,
+          "x": "log10(concentration)",
+          "y": "log10(area)",
+          "note": "0 mg/L 与非正面积点均剔除"
+        },
+        "log10_conc_plus_1": {
+          "r_squared": 0.9865518174239114,
+          "slope": 0.12135152846310716,
+          "intercept": 0.0005907069176284141,
+          "n": 4,
+          "x": "log10(concentration + 1)",
+          "y": "area",
+          "note": "保留 0 mg/L 点的另一种处理方式（+1 平移）"
+        }
+      },
+      "extra": {
+        "integration_window": [
+          499.2635986504307,
+          518.9728339264777
+        ]
+      }
+    }
+  ]
+}
