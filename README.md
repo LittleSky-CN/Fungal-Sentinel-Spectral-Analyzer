@@ -184,6 +184,22 @@ figure is presented as measured data.
 - Camera-auto behaviour (tone mapping, denoising) is bypassed by reading RAW, but sensor
   saturation still invalidates a frame — ROI saturation ≥ 1 % rejects the capture.
 
+## Digitising a lamp datasheet (the Step 2 input)
+
+Step 2 needs the reference SPD of your characterised source, and manufacturers
+publish that as a plot rather than as data. The [`csv_data_cleaner/`](csv_data_cleaner)
+utility in this repository converts points exported from a plot digitizer into the
+`true_spd.csv` Step 2 expects (401 rows, one per nanometre from 350 to 750 nm,
+peak normalised to 1.0), using shape-preserving PCHIP interpolation so the resampled
+curve cannot gain peaks the datasheet does not show.
+
+```bash
+pip install pandas                      # dev/dataset dependency, not a runtime one
+python csv_data_cleaner/csv_data_cleaner.py my_points.csv true_spd.csv
+```
+
+See [`csv_data_cleaner/README.md`](csv_data_cleaner/README.md) for the full procedure.
+
 ## Contributing
 
 **Yes — we are open to contributions**, and we most want the ones that help the
