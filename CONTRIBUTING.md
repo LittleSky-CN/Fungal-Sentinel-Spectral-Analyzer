@@ -210,6 +210,8 @@ core/                  the numerics: calibration, image_processing, fusion,
                        and the three preset types (wavelength / spd / curve)
 gui/                   tkinter presentation only (main_window, details_window,
                        turbidity_window, widgets, theme)
+csv_data_cleaner/      turns a datasheet SPD plot into the true_spd.csv Step 2
+                       consumes (needs pandas, which is not a runtime dependency)
 tests/                 synthetic-input suite + opt-in real-DNG end-to-end tests
 ```
 
