@@ -122,6 +122,29 @@ rather than committed.
    property of the dataset, not of the pipeline, and it is the main open question the
    project is still working on — see *Limitations*.
 
+## Tests
+
+The suite runs on **synthetic input only** — no device, no DNG files, no network:
+
+```bash
+pip install pytest              # dev-only: not a runtime dependency
+python -m pytest tests -q
+```
+
+Verified result on CPython 3.13.12 with the pinned dependencies above:
+**279 passed, 15 skipped, 0 failed**.
+
+- **15 skipped** are the end-to-end tests against real DNG frames. They need the
+  10.15 dataset, which is archived rather than committed; enable them with
+  `FSSA_E2E=1` and point `FSSA_E2E_DATA` at your copy of the frames. Details in
+  [`CONTRIBUTING.md`](CONTRIBUTING.md#4-running-the-tests).
+- GUI tests stub tkinter unconditionally, so the suite behaves identically on a
+  headless CI runner and on a laptop with a display.
+
+Any change to an algorithm shared with the Android side must also keep
+MycoSpec's suite green — that parity gate is described in
+[`CONTRIBUTING.md`](CONTRIBUTING.md#5-the-parity-gate--read-this-before-touching-a-shared-algorithm).
+
 ## Large files and datasets
 
 This repository contains **source only** — no binaries, no datasets, no model weights.
@@ -160,6 +183,24 @@ figure is presented as measured data.
   the R² values are low (see the table above).
 - Camera-auto behaviour (tone mapping, denoising) is bypassed by reading RAW, but sensor
   saturation still invalidates a frame — ROI saturation ≥ 1 % rejects the capture.
+
+## Contributing
+
+**Yes — we are open to contributions**, and we most want the ones that help the
+next team rebuild this instrument: porting the pipeline to another platform,
+adding a fluorophore to the canonical ID set, rebuilding the OptiX optics, or
+simply telling us that a step in the procedure did not reproduce on your
+hardware. A reproducible failure reported back is worth more here than another
+feature.
+
+What we ask: live entirely offline, keep numerics in `core/` and presentation in
+`gui/`, pin any new dependency, write English comments and commit messages, and
+run **both** the Python and the Android test suites when you touch a shared
+algorithm.
+
+Full policy, setup steps, the parity gate and the bug-report template are in
+[`CONTRIBUTING.md`](CONTRIBUTING.md). Using an AI assistant? Read
+[`.claude/RESPONSIBLE_AI_USE.md`](.claude/RESPONSIBLE_AI_USE.md) first.
 
 ## License
 
