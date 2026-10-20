@@ -15,9 +15,11 @@ Read this before you start.
 ## 2. Never fabricate
 - Do **not** let an AI invent experimental results, data, measurements,
   citations, references, statistics, or attributions.
-- All scientific claims must come from your actual work and be verifiable.
-- AI may help you phrase, structure, translate, or debug — it must not generate
-  fake science or pad your pages with content you cannot back up.
+- In this repository specifically: never generate a spectrum, a concentration, an
+  R² value or a detection limit that did not come from running the code. AI may
+  help phrase, structure, translate or debug — it must not generate fake science.
+- Every number published here comes from `python -m pytest tests` or from a real
+  Step 1–4 run on real frames. Keep it that way.
 
 ## 3. Honesty & attribution
 - Keep a human in the loop: review and understand AI-generated text and code
@@ -30,10 +32,11 @@ Read this before you start.
 ## 4. Security & Privacy
 - Review AI-suggested code and dependencies before using them. Do not run
   commands you do not understand.
-- **Never commit secrets or API keys.** Use environment variables / a secrets
-  manager and keep them out of version control.
-- Do not paste personal data, unpublished third-party data, credentials, or
-  anything confidential into AI prompts.
+- **Never commit secrets or API keys.** This project handles no personal data and
+  makes no outbound calls; keeping it that way is a design decision, not an
+  oversight.
+- Do not paste unpublished third-party data, credentials, or anything
+  confidential into AI prompts.
 
 ---
 
