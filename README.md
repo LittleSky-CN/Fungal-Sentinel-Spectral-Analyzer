@@ -182,7 +182,9 @@ figure is presented as measured data.
 - Step 4 fits are only as good as the concentration series behind them; with four groups
   the R² values are low (see the table above).
 - Camera-auto behaviour (tone mapping, denoising) is bypassed by reading RAW, but sensor
-  saturation still invalidates a frame — ROI saturation ≥ 1 % rejects the capture.
+  saturation still invalidates a frame. MycoSpec enforces this at capture time (a frame
+  with ≥ 1 % saturated pixels inside the ROI is rejected); FSSA has no automatic
+  saturation gate — inspect the RAW preview before trusting a batch.
 
 ## Digitising a lamp datasheet (the Step 2 input)
 
