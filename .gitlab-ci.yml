@@ -20,6 +20,16 @@ stages:
 core-smoke-test:
   stage: verify
   image: python:3.13
+  rules:
+    # Tag pipelines never get a runner on the iGEM GitLab instance: every tag
+    # push sat pending for ~2 h and then failed with
+    # stuck_pending_no_matching_runners, while the branch pipeline for the very
+    # same commit passed in ~30 s. A tag always points at a commit that has
+    # already been verified as a branch, so verification is skipped for tags
+    # rather than left permanently red.
+    - if: $CI_COMMIT_TAG
+      when: never
+    - when: on_success
   script:
     - python -V
     - python -m pip install --no-cache-dir --upgrade pip
