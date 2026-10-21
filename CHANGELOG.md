@@ -1,6 +1,11 @@
 # Changelog — FSSA (Fungal Sentinel Spectral Analyzer)
 
 Python reference implementation of the Fungal Sentinel spectral pipeline.
+**This file is FSSA — the Python desktop program — and nothing else.** The
+Android client MycoSpec publishes its own changelog in its own repository; the
+two are mentioned in the same sentence only where they implement a shared
+numerical reference, and every such mention is marked as a cross-reference.
+
 All dates are commit dates; every entry is sourced from repository history, and
 every released version maps to a Git tag. Short commit hashes are given so each
 claim can be checked against the tree.
@@ -97,10 +102,10 @@ Test baseline at every point is quoted from `README.md` / the suites themselves.
   (`decc744`): the old status line always read "Done!". Covered by 32 new test
   cases (`tests/test_step1_quality_status.py`) and 6 new PDF-parity cases, all
   mutation-verified.
-- **README claimed a saturation gate that does not exist** (`f8ebf1d`): it said
-  "ROI saturation ≥ 1 % rejects the capture", but no Python code path checks
-  saturation. The limitation now reads honestly — MycoSpec enforces the check at
-  capture time; FSSA does not, so inspect the RAW preview before trusting a batch.
+- **README claimed a saturation gate that does not exist** (`f8ebf1d`): it
+  promised "ROI saturation ≥ 1 % rejects the capture", but no Python code path
+  checks saturation. The limitation now reads honestly — FSSA performs no
+  saturation check at all, so review the RAW preview before trusting a batch.
 
 ### Breaking change
 
@@ -264,27 +269,94 @@ unpatched code (one reproduces the exact traceback).
 
 ---
 
-## Before v1.4.5 — 2026-10-01 … 2026-10-16
+### Before v1.4.5 — 2026-10-01 … 2026-10-16 (no tags)
 
-No release tags exist for this window; these commits are recorded here because
-they changed behaviour, with only the evidence available in history:
+Only v1.4.5 onwards carries a Git tag. Everything below is reconstructed from
+the history that actually exists in this repository — whose first commit is
+2026-10-01 — and every entry states what a diff shows, nothing more. Versions
+≤ v1.4.1 predate this repository and are deliberately not listed.
 
-- **2026-10-01 — first published tree, v1.4.2** (`b24fcb5`): `core/`
-  (`calibration`, `fusion`, `image_processing`, `quantification`,
-  `spectral_features`, `turbidity`) and `gui/` (`main_window`,
-  `details_window`, `turbidity_window`, `widgets`), 1 703 lines. Nothing is
-  recorded about what preceded it; versions ≤ v1.4.1 predate this repository's
-  history and are not listed.
-- **2026-10-11** (`264308a`, +340 / −287): SPD calibration reworked in
-  `core/fusion.py` and `gui/details_window.py`.
-- **2026-10-11** (`00ee815`, +1 270 / −481): UI revision towards the layout used
-  by the Android client — new `gui/theme.py`, rewritten main and details windows,
-  new widgets.
-- **2026-10-16** (`1584d9f`, +465): `core/unmixing.py` introduced, calibration and
-  metadata handling extended, with three new test modules
-  (`test_calibration_response`, `test_image_processing_metadata`,
-  `test_unmixing_reference`). This is where the spectral-unmixing metric landed.
-- **2026-10-16** (`8bee466`, +342): further algorithm work across
-  `core/image_processing.py` and `core/spectral_features.py`, application icon
-  and bundled `assets/fssa.ico`.
+*Cross-reference:* the Android client kept step with this window on the same
+days (2026-10-11 and 2026-10-16); those are its own commits and are documented
+in its own changelog.
+
+---
+
+## v1.4.4 — 2026-10-11 … 2026-10-16
+
+The window title carries `v1.4.4` from `00ee815` onwards. No tag exists for it.
+
+### Added
+
+- **Spectral unmixing lands** (`00ee815`, extended in `1584d9f`).
+  `core/unmixing.py` arrives with `default_unmix_window()`,
+  `build_reference_emission()`, `emission_auc()` and `unmix_spectrum()` — the
+  low-LoD metric that Step 4 later uses instead of plain band integration — and
+  gains `select_reference_emission()` in `1584d9f`, together with the first
+  three reference test modules (`test_unmixing_reference`,
+  `test_calibration_response`, `test_image_processing_metadata`).
+- **Is the slope significant?** (`00ee815`): `slope_t_statistic()` makes the
+  standard curve's slope testable, which is what later lets the app refuse to
+  print a concentration when the slope is not significant.
+- **Automatic peak metrology** (`8bee466`): `find_peak_auto()` searches outward
+  from the known wavelength inside a valley-bounded window and returns a
+  `PeakResult`; `calculate_spectral_features()` computes peak, FWHM and
+  centroid from one call. Previously each caller searched its own way.
+- **Correct, clean, then integrate** (`1584d9f`): `correct_by_response()`
+  divides a profile by the Step 2 response, `remove_isolated_spikes()`
+  suppresses single-point outliers, and
+  `analyze_blank_subtracted_replicates()` carries the replicate mean and SD
+  through to the result.
+- **Hardened linear RAW reading** (`1584d9f`): `read_dng_linear_rgb()` decodes
+  RATIONAL tags through `_rational_to_float()` and takes the black level from
+  the DNG page (`_black_level_from_page()`) instead of assuming it.
+- **Theme layer for the GUI** (`00ee815`): `gui/theme.py` (`apply_theme`,
+  `StepBanner`, `register_pixel_font`) with `themed_button` / `themed_label` in
+  `gui/widgets.py`; main and details windows rewritten on top of it
+  (+1 270 / −481).
+- **Application icon** (`8bee466`): `assets/fssa.ico` plus `gui/app_icon.py`,
+  setting the icon on the Tk window and on the Windows taskbar.
+
+### Changed
+
+- **Channel fusion rewritten** (`264308a`, +340 / −287): `core/fusion.py`
+  becomes `auto_handoffs()` → `channel_weights()` → `fuse_pointwise()` around a
+  logistic cross-fade (`_logistic()`) centred on the equal-responsivity
+  wavelengths. That logistic relay is exactly what v1.4.5 replaces with
+  response-proportional weights.
+- **Step 2 validates against independent data** (`264308a`): the positioning
+  profiles used to check a response measurement are no longer the same frames
+  it was measured from — the source marker for this change is 【v1.4.4-fix】.
+
+### Test baseline
+
+The first dedicated `core/` test modules arrive in this window (`1584d9f`);
+there is no suite-wide count to quote before v1.4.6.
+
+---
+
+## v1.4.2 / v1.4.3 — 2026-10-01
+
+The first published tree (`b24fcb5`, 1 703 lines), preceded only by the empty
+repository commit `a715c72` (`.gitattributes`, `.gitignore`, `LICENSE`,
+`README.md`) on the same day. The tree carries **two version numbers at once**:
+the main window declares **v1.4.2**, while `core/` already has the 【v1.4.3】
+simplification markers. Both are quoted rather than resolved.
+
+### Added
+
+- `core/`: `calibration` — per-channel response in absolute units, explicitly
+  **without** Savitzky–Golay smoothing and **without** per-channel
+  self-normalisation, the 【v1.4.3】 decision that still holds today — plus
+  `fusion`, `image_processing`, `quantification`, `spectral_features` and
+  `turbidity`.
+- `gui/`: `main_window` (the four-step flow and the turbidity mode),
+  `details_window` (report window with parameter panels), `turbidity_window`
+  and `widgets`.
+- `config.py` and the `main.py` entry point.
+
+### Notes
+
+Nothing here was released under a tag, and the history records nothing about
+what preceded the first commit.
 
