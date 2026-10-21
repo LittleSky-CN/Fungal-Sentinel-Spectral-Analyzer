@@ -1,9 +1,16 @@
 # gui/main_window.py
-"""Main GUI Window for FSSA v1.5.0 (Spectral Unmixing LoD + Weighted Fusion + Turbidity).
+"""Main GUI Window for FSSA v1.6.0 (Spectral Unmixing LoD + Weighted Fusion + Turbidity).
 
 [v1.5.0] Added the Fluorescein (sodium salt) fluorophore option (emission 520 nm / excitation 494 nm / green
 channel / FWHM 25); fluorophore identifiers are unified as canonical IDs (canonical_fluorophore() was added for
 normalised parsing) so curve presets interoperate with the Android app.
+[v1.6.0] Step 2 presets are stored as SPD payload v3 on the canonical 380-780 nm / 1 nm grid
+(401 points), so a preset no longer depends on the sensor width or the pixel<->nm mapping it was
+recorded with -- a preset written by an earlier version is refused and must be re-exported. Step 1
+now carries an explicit quality tier (PASS / WARNING / FAILED) both in the status line and in the
+report, so a failed calibration warns instead of silently reading "Done!". Relicensed to
+Apache-2.0, dependencies pinned in requirements.txt, OpenCV dropped, source comments in English,
+the test suite ships with the repository, and csv_data_cleaner/ now lives here too.
 Theme-aware (gui/theme.py optional): neon-pop look when enabled, classic look otherwise.
 """
 import re
@@ -108,7 +115,7 @@ class FSSA_GUI:
         self.is_turbidity_mode = (analysis_mode == "turbidity")
 
         title_suffix = "TURBIDITY" if self.is_turbidity_mode else analysis_mode.upper()
-        self.root.title(f"Fungal Sentinel Spectral Analyzer (FSSA) v1.5.0 [{title_suffix}] - iGEM 2026")
+        self.root.title(f"Fungal Sentinel Spectral Analyzer (FSSA) v1.6.0 [{title_suffix}] - iGEM 2026")
         self.root.geometry("1600x950")
         self.root.minsize(1400, 900)
 
@@ -224,10 +231,10 @@ class FSSA_GUI:
         if _THEME_ON:
             self.banner = _theme.StepBanner(left_frame)
             self.banner.pack(fill=tk.X, pady=(10, 0))
-            ttk.Label(left_frame, text=f"FSSA v1.5.0  [{self.analysis_mode.upper()}]",
+            ttk.Label(left_frame, text=f"FSSA v1.6.0  [{self.analysis_mode.upper()}]",
                       style="Title.TLabel").pack(pady=(6, 0))
         else:
-            ttk.Label(left_frame, text=f"FSSA v1.5.0\n({self.analysis_mode.upper()})",
+            ttk.Label(left_frame, text=f"FSSA v1.6.0\n({self.analysis_mode.upper()})",
                       font=("Arial", 14, "bold")).pack(pady=15)
 
         self.content_frame = ttk.Frame(left_frame)
@@ -296,7 +303,7 @@ class FSSA_GUI:
 
         self.fig = Figure(figsize=(8, 5), dpi=100)
         self.ax = self.fig.add_subplot(111)
-        self.ax.set_title("Welcome to FSSA v1.5.0\nPlease proceed with Step 1: Positioning.")
+        self.ax.set_title("Welcome to FSSA v1.6.0\nPlease proceed with Step 1: Positioning.")
         self.ax.axis('off')
         self._style_fig(self.fig)
         self.canvas_plot = FigureCanvasTkAgg(self.fig, master=right_frame)

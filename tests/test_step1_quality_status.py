@@ -99,7 +99,7 @@ def _write_preset(tmp_path, quality, g_error, name="wavelength.json"):
     """直接写 payload JSON，绕开 save_wavelength_preset 的 quality 推导。"""
     path = tmp_path / name
     payload = {
-        "preset_type": "WAVELENGTH", "schema_version": 1, "app_version": "1.5.0",
+        "preset_type": "WAVELENGTH", "schema_version": 1, "app_version": "1.6.0",
         "created_at": "2026-01-01T00:00:00Z", "name": "field-wl",
         "slope": -2.738911, "intercept": 3198.4744,
         "gErrorNm": g_error, "quality": quality,

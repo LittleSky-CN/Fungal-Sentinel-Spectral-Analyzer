@@ -1,9 +1,16 @@
 # main.py
-"""FSSA v1.5.0 Main Entry Point.
+"""FSSA v1.6.0 Main Entry Point.
 
 [v1.5.0] Added the Fluorescein (sodium salt) fluorophore option (emission 520 nm / excitation 494 nm / green
 channel / FWHM 25); fluorophore identifiers are unified as canonical IDs (canonical_fluorophore() was added for
 normalised parsing) so curve presets interoperate with the Android app.
+[v1.6.0] Step 2 presets are stored as SPD payload v3 on the canonical 380-780 nm / 1 nm grid
+(401 points), so a preset no longer depends on the sensor width or the pixel<->nm mapping it was
+recorded with -- a preset written by an earlier version is refused and must be re-exported. Step 1
+now carries an explicit quality tier (PASS / WARNING / FAILED) both in the status line and in the
+report, so a failed calibration warns instead of silently reading "Done!". Relicensed to
+Apache-2.0, dependencies pinned in requirements.txt, OpenCV dropped, source comments in English,
+the test suite ships with the repository, and csv_data_cleaner/ now lives here too.
 - analysis mode selection (LoD/IUPAC, Legacy, Turbidity)
 - optional neon theme (gui/theme.py + config.py, falls back to the classic look when missing)
 - unified team icon (gui/app_icon.py: multi-size transparent .ico; Toplevels inherit it automatically)
@@ -69,7 +76,7 @@ class ModeSelector:
         apply_app_icon(root)            # team icon: initial selection window
         _apply_theme_if_enabled(root)
 
-        self.root.title("FSSA v1.5.0 - Analysis Mode Selection")
+        self.root.title("FSSA v1.6.0 - Analysis Mode Selection")
         self.root.geometry("600x650")
         self.root.resizable(True, True)
         self.root.eval('tk::PlaceWindow . center')

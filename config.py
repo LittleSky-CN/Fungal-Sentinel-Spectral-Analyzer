@@ -1,10 +1,17 @@
 # config.py
-"""FSSA v1.5.0 Global Configuration.
+"""FSSA v1.6.0 Global Configuration.
 
 [v1.5.0] Added the Fluorescein (sodium salt) fluorophore option (emission 520 nm /
 excitation 494 nm / green channel / FWHM 25); fluorophore identifiers are unified as
 canonical IDs (the FLUOROPHORES dict keys are now YPET/EGFP/FLUORESCEIN/MCHERRY/CFP/MTURQUOISE2,
 and canonical_fluorophore() normalises them) so curve presets interoperate with the Android app.
+[v1.6.0] Step 2 presets are stored as SPD payload v3 on the canonical 380-780 nm / 1 nm grid
+(401 points), so a preset no longer depends on the sensor width or the pixel<->nm mapping it was
+recorded with -- a preset written by an earlier version is refused and must be re-exported. Step 1
+now carries an explicit quality tier (PASS / WARNING / FAILED) both in the status line and in the
+report, so a failed calibration warns instead of silently reading "Done!". Relicensed to
+Apache-2.0, dependencies pinned in requirements.txt, OpenCV dropped, source comments in English,
+the test suite ships with the repository, and csv_data_cleaner/ now lives here too.
 """
 
 # =============================================================================
