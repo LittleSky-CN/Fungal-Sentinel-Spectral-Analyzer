@@ -8,7 +8,7 @@ these instructions can rebuild the instrument and its software.**
 - Repository: <https://gitlab.igem.org/2026/software/cau-china/fungal-sentinel-spectral-analyzer>
   (mirror: <https://github.com/LittleSky-CN/Fungal-Sentinel-Spectral-Analyzer>)
 - Android sibling: **MycoSpec** — <https://gitlab.igem.org/2026/software/cau-china/mycospec>
-- Latest: **FSSA v1.5.0** · License: **Apache-2.0** (see [LICENSE](LICENSE))
+- Latest: **FSSA v1.6.0** · License: **Apache-2.0** (see [LICENSE](LICENSE))
 
 This document answers three questions: *what do we accept*, *how do you get set
 up*, and *what has to be true before a change lands*.
@@ -175,7 +175,7 @@ A reproducible failure reported back is worth more to the next team than another
 feature. Open an issue on iGEM GitLab with:
 
 ```
-Version / commit:      FSSA v1.5.0 @ <commit sha>
+Version / commit:      FSSA v1.6.0 @ <commit sha>
 Platform:              OS, Python version, tkinter available? yes/no
 Input:                 which DNGs or synthetic fixture (attach if small)
 Steps 1-4 inputs:      positioning frames, characterised source + its SPD CSV, blanks, standards

@@ -1,6 +1,8 @@
 # core/calibration.py
 """Wavelength mapping and Spectral Power Distribution (SPD) calibration.
 [v1.5.0] Fluorophore identifiers unified as canonical IDs, APP_VERSION raised to 1.5.0, interoperable with the Android curve presets.
+[v1.6.0] APP_VERSION raised to 1.6.0; SPD payload v3 (canonical grid) is the only schema the loader accepts, so a
+preset written by an earlier version is refused with an actionable message rather than silently migrated.
 v1.4.3 simplification: per-channel absolute response, NO Savitzky-Golay, NO self-normalization.
 
 [SPD payload v3] The response curve is no longer indexed by pixel: ``calibrate()`` still divides in the
@@ -24,7 +26,7 @@ from config import DEFAULT_PARAMS
 # duplicated on the Android side (MycoSpec
 # analysis/SpectralResponseCalibrator.kt); keep both in sync.
 # ---------------------------------------------------------------------------
-APP_VERSION = "1.5.0"
+APP_VERSION = "1.6.0"
 SPD_SCHEMA_VERSION = 3
 PRESET_TYPE_SPD = "SPD"
 SPD_GRID_START_NM = 380.0

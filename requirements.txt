@@ -1,4 +1,4 @@
-# FSSA v1.5.0 runtime dependencies — exact, tested versions (lockfile).
+# FSSA v1.6.0 runtime dependencies — exact, tested versions (lockfile).
 #
 # These are the versions the software was last run and verified with
 # (CPython 3.13.12, Windows, tkinter GUI). Install with:

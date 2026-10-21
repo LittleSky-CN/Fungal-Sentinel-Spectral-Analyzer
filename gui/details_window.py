@@ -1,9 +1,16 @@
 # gui/details_window.py
-"""FSSA v1.5.0 Detailed Analysis Report.
+"""FSSA v1.6.0 Detailed Analysis Report.
 
 [v1.5.0] Added the Fluorescein (sodium salt) fluorophore option (emission 520 nm / excitation 494 nm / green
 channel / FWHM 25); fluorophore identifiers are unified as canonical IDs (canonical_fluorophore() was added for
 normalised parsing) so curve presets interoperate with the Android app.
+[v1.6.0] Step 2 presets are stored as SPD payload v3 on the canonical 380-780 nm / 1 nm grid
+(401 points), so a preset no longer depends on the sensor width or the pixel<->nm mapping it was
+recorded with -- a preset written by an earlier version is refused and must be re-exported. Step 1
+now carries an explicit quality tier (PASS / WARNING / FAILED) both in the status line and in the
+report, so a failed calibration warns instead of silently reading "Done!". Relicensed to
+Apache-2.0, dependencies pinned in requirements.txt, OpenCV dropped, source comments in English,
+the test suite ships with the repository, and csv_data_cleaner/ now lives here too.
 Tab 2 fixed: Figure 4a-4d with ONE continuous pointwise-fused curve
 (weights response-proportional, sum = 1, no cross-wavelength smoothing).
 """
@@ -70,7 +77,7 @@ def _safe_div(a, b):
 class DetailsWindow:
     def __init__(self, parent, cache1, cache2, cache3, cache4, mapping, preset_provenance=None):
         self.win = tk.Toplevel(parent)
-        self.win.title("FSSA v1.5.0 — Detailed Analysis Report & Parameters")
+        self.win.title("FSSA v1.6.0 — Detailed Analysis Report & Parameters")
         self.win.geometry("2000x2000")
         if _THEME_ON:
             _theme.tint(self.win)

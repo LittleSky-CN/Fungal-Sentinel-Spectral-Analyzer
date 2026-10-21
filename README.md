@@ -4,7 +4,7 @@ Open-source, offline-first spectral analysis software for a low-cost portable fu
 fluorescence detector. Smartphone DNG + grating spectroscopy → quantitative
 fluorescence and turbidity.
 
-**FSSA v1.5.0** · Python desktop reference implementation · iGEM 2026, team CAU-China
+**FSSA v1.6.0** · Python desktop reference implementation · iGEM 2026, team CAU-China
 
 Android counterpart: **MycoSpec** — <https://github.com/LittleSky-CN/Mycospec>
 

@@ -1,4 +1,4 @@
-"""报告窗口 vs 导出 PDF 的内容一致性（FSSA v1.5.0）。
+"""报告窗口 vs 导出 PDF 的内容一致性（FSSA v1.6.0）。
 
 ``gui/details_window.py`` 里每个 Tab 的参数是双重承载的：
 
